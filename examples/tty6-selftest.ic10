@@ -1,0 +1,127 @@
+# TTY-6 self test, terminal on d0. Register checks tally into FAILS=n
+# (0 = all pass); visual checks annotated inline. Type only after TYPE.
+# appears. Overflow flag not covered (needs 256+ typed chars).
+alias term d0
+alias n r0
+alias c r1
+alias p r2
+alias fails r3
+define ADDR_DATA 0
+define ADDR_STR 1
+define ADDR_COUNT 2
+define ADDR_CTRL 3
+define ADDR_ROW 4
+define ADDR_COL 5
+define CH_BS 8
+define CH_CR 13
+define CH_DEL 127
+define CH_NEL 133
+move fails 0
+s term On 1
+clr term                 # full reset: screen, FIFO, flags, modes
+get n term ADDR_CTRL     # T1: status reads 0 after clr
+jal check
+put term ADDR_STR STR("JUNK")
+put term ADDR_DATA 12    # T2: FF clears the screen, cursor home
+get n term ADDR_ROW
+get c term ADDR_COL
+add n n c
+jal check
+put term ADDR_STR STR("TTY-6 ")
+put term ADDR_STR STR("TEST")
+put term ADDR_DATA CH_NEL
+put term ADDR_STR STR("DELX")   # DEL rubout: X must vanish -> DEL
+put term ADDR_DATA CH_DEL
+put term ADDR_DATA CH_NEL
+put term ADDR_STR STR("BSAX")   # BS moves only: X must stay -> BSAX
+put term ADDR_DATA CH_BS
+put term ADDR_DATA CH_NEL
+put term ADDR_STR STR("XXXXXX")
+put term ADDR_DATA CH_CR        # CR: overwrite from col 0 -> CR-OK
+put term ADDR_STR STR("CR-OK ")
+put term ADDR_DATA 10           # bare LF keeps the column (6)
+put term ADDR_STR STR("LF-OK ")
+put term ADDR_DATA CH_NEL
+s term Setting STR("VIA-ST")    # Setting write prints a packed string
+put term ADDR_DATA CH_NEL
+l n term Setting                # T3: Setting reads back what was set
+sub n n STR("VIA-ST")
+jal check
+put term ADDR_ROW 12            # T4: wrap at col 40 = CR+LF
+put term ADDR_COL 38
+put term ADDR_STR STR("AB")
+get n term ADDR_ROW
+get c term ADDR_COL
+sub n n 13
+add n n c
+jal check
+put term ADDR_CTRL 5     # output buffered
+put term ADDR_CTRL 7     # input buffered
+put term ADDR_CTRL 9     # local echo on
+get n term ADDR_CTRL     # T5: status bits = 4|8|16
+sub n n 28
+jal check
+get n term ADDR_DATA     # T6: buffered pop of empty FIFO = 0
+jal check
+put term ADDR_ROW 13
+put term ADDR_COL 0
+put term ADDR_DATA STR("BUFOUT") # buffered DATA write prints a string
+put term ADDR_CTRL 4
+put term ADDR_CTRL 6
+put term ADDR_CTRL 8
+get n term ADDR_CTRL     # T7: back to defaults, status 0 again
+jal check
+put term ADDR_ROW 15     # T8: cursor addressing + readback
+put term ADDR_COL 20
+put term ADDR_STR STR("ADDR15")
+get n term ADDR_ROW
+get c term ADDR_COL
+sub n n 15
+sub c c 26
+add n n c
+jal check
+put term ADDR_ROW 99     # T9: cursor writes clamp to 19 / 39
+put term ADDR_COL 99
+get n term ADDR_ROW
+get c term ADDR_COL
+sub n n 19
+sub c c 39
+add n n c
+jal check
+get n term ADDR_COUNT    # T10: COUNT 0, unbuffered empty pop 0
+get c term ADDR_DATA
+add n n c
+jal check
+put term ADDR_ROW 17
+put term ADDR_COL 0
+put term ADDR_STR STR("FAILS=")
+add n fails 48
+put term ADDR_DATA n
+put term ADDR_DATA CH_NEL
+put term ADDR_STR STR("TYPE.")
+put term ADDR_DATA CH_NEL
+j echo
+check:
+sne n n 0
+add fails fails n
+j ra
+echo:                    # echo loop; peek (STR read) must equal pop
+yield
+l n term Quantity
+blez n echo
+get p term ADDR_STR
+get c term ADDR_DATA
+bne c p mismatch
+bne c CH_CR notcr
+move c CH_NEL            # echo Enter (CR) as a full newline
+notcr:
+bne c CH_BS notbs
+move c CH_DEL            # echo Backspace (BS) as a rubout
+notbs:
+put term ADDR_DATA c
+j echo
+mismatch:
+put term ADDR_STR STR("PEEK!=")
+put term ADDR_STR STR("POP")
+put term ADDR_DATA CH_NEL
+j echo

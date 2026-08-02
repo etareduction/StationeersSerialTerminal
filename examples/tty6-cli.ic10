@@ -1,0 +1,91 @@
+# TTY-6 command line: help / ping / clear (first letter counts).
+# Serial terminal on d0, half duplex (CTRL 9): the terminal echoes
+# keystrokes itself, so this program prints only responses.
+alias term d0
+alias cmd r0
+alias ch r1
+alias len r2
+
+define ADDR_DATA 0   # r: pop keystroke, 0 if none / w: print char
+define ADDR_STR 1    # w: print packed STR("...")
+define ADDR_CTRL 3   # w: command
+define CTRL_CLEAR_SCREEN 1
+define CTRL_ECHO_ON 9
+define CH_BS 8       # Backspace key
+define CH_CR 13      # Enter key
+define CH_NEL 133    # print: newline (CR+LF)
+define CH_PROMPT 62  # '>'
+define CMD_HELP 104  # 'h'
+define CMD_PING 112  # 'p'
+define CMD_CLEAR 99  # 'c'
+
+s term On 1
+
+init:                        # a power cycle wipes screen and modes
+    put term ADDR_CTRL CTRL_CLEAR_SCREEN
+    put term ADDR_CTRL CTRL_ECHO_ON
+    put term ADDR_STR STR("READY.")
+    put term ADDR_DATA CH_NEL
+
+prompt:
+    put term ADDR_DATA CH_PROMPT
+    move cmd 0
+    move len 0
+
+readline:
+    get ch term ADDR_DATA
+    bgtz ch consume
+    l ch term Power          # 0 while the terminal is off/unpowered
+    beqz ch powerwait
+    yield
+    j readline
+
+powerwait:
+    yield
+    l ch term Power
+    beqz ch powerwait
+    j init
+
+consume:
+    beq ch CH_CR dispatch
+    beq ch CH_BS rubout
+    blt ch 32 readline
+    add len len 1
+    bnez cmd readline
+    move cmd ch
+    j readline
+
+rubout:                      # the terminal already erased the glass
+    blez len readline
+    sub len len 1
+    bgtz len readline
+    move cmd 0
+    j readline
+
+dispatch:
+    blez cmd prompt
+    or cmd cmd 32
+    beq cmd CMD_HELP help
+    beq cmd CMD_PING ping
+    beq cmd CMD_CLEAR clear
+    put term ADDR_STR STR("WHAT?")
+    put term ADDR_DATA CH_NEL
+    j prompt
+
+help:
+    put term ADDR_STR STR("HELP")
+    put term ADDR_DATA CH_NEL
+    put term ADDR_STR STR("PING")
+    put term ADDR_DATA CH_NEL
+    put term ADDR_STR STR("CLEAR")
+    put term ADDR_DATA CH_NEL
+    j prompt
+
+ping:
+    put term ADDR_STR STR("PONG")
+    put term ADDR_DATA CH_NEL
+    j prompt
+
+clear:
+    put term ADDR_CTRL CTRL_CLEAR_SCREEN
+    j prompt
