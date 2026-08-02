@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<GameData xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <ElectronicsPrinterRecipes>
+    <RecipeData>
+      <PrefabName>ItemKitSerialTerminal</PrefabName>
+      <Recipe>
+        <Time>40</Time>
+        <Energy>3000</Energy>
+        <Copper>10</Copper>
+        <Gold>5</Gold>
+        <Steel>2</Steel>
+        <Solder>2</Solder>
+      </Recipe>
+    </RecipeData>
+  </ElectronicsPrinterRecipes>
+</GameData>

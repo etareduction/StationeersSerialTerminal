@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Language xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>English</Name>
+  <Code>EN</Code>
+  <Things>
+    <RecordThing>
+      <Key>StructureSerialTerminal</Key>
+      <Value>Serial Terminal</Value>
+      <Description>The Norsec TTY-6 'Teletype' is a deliberately dumb glass terminal: no processor, no storage, just a phosphor-bright character display and a keyboard controller wired to a 4-register serial UART. Any {THING:StructureCircuitHousing;IC Housing} can drive it with the get and put instructions.
+
+Registers: 0 DATA (put: print an ASCII character; get: pop the next typed character, 0 if none), 1 STRING (put: print a packed 6-character string, e.g. put d0 1 STR("HELLO "); get: peek next typed character), 2 COUNT (get: characters waiting in the 256-byte input buffer), 3 CONTROL (put 1: clear screen, 2: flush input, 3: clear the overflow flag; get: status bits).
+
+Writing the Setting logic variable prints a packed string. Quantity reports input waiting, Error reports input-buffer overflow. Click the screen to type a line; the terminal never echoes locally - what appears on the glass is exactly what the circuit prints, like any honest teletype since the dawn of the space age.</Description>
+    </RecordThing>
+    <RecordThing>
+      <Key>ItemKitSerialTerminal</Key>
+      <Value>Kit (Serial Terminal)</Value>
+      <Description>This kit places a Norsec TTY-6 Serial Terminal, a wall-mounted character display and keyboard readable and writable by IC10 circuits.</Description>
+    </RecordThing>
+  </Things>
+</Language>

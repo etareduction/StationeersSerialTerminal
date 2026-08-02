@@ -1,0 +1,76 @@
+# Norsec TTY-6 serial terminal - self test
+# IC housing pin d0 -> Serial Terminal
+alias term d0
+alias n r0
+alias c r1
+alias p r2
+
+define ADDR_DATA 0
+define ADDR_STR 1
+define ADDR_COUNT 2
+define ADDR_CTRL 3
+
+# --- 1. bring the screen up ---------------------------
+s term On 1
+s term Mode 1            # 1 = Silent (0 = local Echo)
+put term ADDR_CTRL 2     # flush input FIFO
+put term ADDR_CTRL 3     # clear overflow flag
+put term ADDR_CTRL 1     # clear screen
+
+# --- 2. packed-string writes (address 1) --------------
+put term ADDR_STR STR("TTY-6 ")
+put term ADDR_STR STR("SELFTE")
+put term ADDR_STR STR("ST")
+put term ADDR_DATA 10
+
+# --- 3. Setting logic-write should print too ----------
+s term Setting STR("VIA-ST")
+put term ADDR_DATA 10
+
+# --- 4. single characters (address 0) -----------------
+move n 65
+charloop:
+put term ADDR_DATA n
+add n n 1
+blt n 91 charloop        # A..Z, must wrap onto the next row
+put term ADDR_DATA 10
+
+# --- 5. control characters ----------------------------
+put term ADDR_STR STR("BKSPX")
+put term ADDR_DATA 8     # backspace: the X must disappear
+put term ADDR_DATA 10
+put term ADDR_STR STR("XXXXXX")
+put term ADDR_DATA 13    # CR: cursor back to column 0
+put term ADDR_STR STR("CR-OK ")
+put term ADDR_DATA 10
+
+# --- 6. status registers, FIFO still empty ------------
+get n term ADDR_COUNT    # expect 0
+get c term ADDR_CTRL     # expect 0
+add n n 48
+add c c 48
+put term ADDR_STR STR("CNT=")
+put term ADDR_DATA n
+put term ADDR_STR STR(" ST=")
+put term ADDR_DATA c
+put term ADDR_DATA 10
+put term ADDR_STR STR("TYPE.")
+put term ADDR_DATA 10
+
+# --- 7. echo loop: click the screen, type, press Enter
+echo:
+yield
+l n term Quantity        # logic view of the FIFO
+blez n echo
+get p term ADDR_STR      # peek, must not consume
+get c term ADDR_DATA     # pop
+bne c p mismatch
+put term ADDR_DATA c     # echo the char back to the glass
+j echo
+
+mismatch:
+put term ADDR_DATA 10
+put term ADDR_STR STR("PEEKNE")
+put term ADDR_STR STR("POP")
+put term ADDR_DATA 10
+j echo

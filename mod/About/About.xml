@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ModMetadata xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Name>Serial Terminal</Name>
+  <Author>etareduction</Author>
+  <Version>0.2.0</Version>
+  <Description>Adds the Norsec TTY-6 Serial Terminal: a wall-mounted glass teletype your IC10 circuits can print to and read typed input from, through a classic memory-mapped UART (get/put). Click the screen to type.
+
+IC10 quick reference (device d0):
+  put d0 0 char      - print one ASCII character
+  put d0 1 str       - print a packed string, e.g. put d0 1 STR("HELLO ")
+  get r0 d0 0        - pop next typed character (0 if none)
+  get r0 d0 2        - characters waiting
+  put d0 3 1         - clear screen
+Logic: Setting (write packed string), Quantity (input waiting), Error (input overflow), Mode (Echo/Silent), Color.</Description>
+  <ModID>SerialTerminal</ModID>
+  <Tags>
+    <Tag>Structures</Tag>
+    <Tag>IC10</Tag>
+  </Tags>
+</ModMetadata>
