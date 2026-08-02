@@ -1,3 +1,7 @@
+# Reference assemblies: symlinks into the local game install, created by setup.sh.
+# The game's own DLLs are not redistributable, so they never enter the repo.
+lib/
+
 # Build output
 bin/
 obj/

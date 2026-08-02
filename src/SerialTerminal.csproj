@@ -12,65 +12,71 @@
     <OutputPath>$(MSBuildProjectDirectory)/../mod/</OutputPath>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DebugType>none</DebugType>
-    <GamePath>/mnt/990/steam/steamapps/common/Stationeers</GamePath>
-    <ManagedPath>$(GamePath)/rocketstation_Data/Managed</ManagedPath>
+    <!-- Game and BepInEx assemblies are not redistributable, so lib/ is gitignored
+         symlinks into the local install. Run ./setup.sh to populate it. -->
+    <LibPath>$(MSBuildProjectDirectory)/../lib</LibPath>
   </PropertyGroup>
+
+  <Target Name="CheckLibPath" BeforeTargets="BeforeResolveReferences">
+    <Error Condition="!Exists('$(LibPath)/Assembly-CSharp.dll')"
+           Text="No reference assemblies in $(LibPath). Run ./setup.sh from the repo root to link them from your Stationeers install." />
+  </Target>
 
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
-      <HintPath>$(ManagedPath)/Assembly-CSharp.dll</HintPath>
+      <HintPath>$(LibPath)/Assembly-CSharp.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Assembly-CSharp-firstpass">
-      <HintPath>$(ManagedPath)/Assembly-CSharp-firstpass.dll</HintPath>
+      <HintPath>$(LibPath)/Assembly-CSharp-firstpass.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>$(ManagedPath)/UnityEngine.dll</HintPath>
+      <HintPath>$(LibPath)/UnityEngine.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>$(ManagedPath)/UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(LibPath)/UnityEngine.CoreModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.InputLegacyModule">
-      <HintPath>$(ManagedPath)/UnityEngine.InputLegacyModule.dll</HintPath>
+      <HintPath>$(LibPath)/UnityEngine.InputLegacyModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.PhysicsModule">
-      <HintPath>$(ManagedPath)/UnityEngine.PhysicsModule.dll</HintPath>
+      <HintPath>$(LibPath)/UnityEngine.PhysicsModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UnityEngine.AnimationModule">
-      <HintPath>$(ManagedPath)/UnityEngine.AnimationModule.dll</HintPath>
+      <HintPath>$(LibPath)/UnityEngine.AnimationModule.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="Unity.TextMeshPro">
-      <HintPath>$(ManagedPath)/Unity.TextMeshPro.dll</HintPath>
+      <HintPath>$(LibPath)/Unity.TextMeshPro.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="RG.ImGui">
-      <HintPath>$(ManagedPath)/RG.ImGui.dll</HintPath>
+      <HintPath>$(LibPath)/RG.ImGui.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="RG.ImGui.Unity">
-      <HintPath>$(ManagedPath)/RG.ImGui.Unity.dll</HintPath>
+      <HintPath>$(LibPath)/RG.ImGui.Unity.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="UniTask">
-      <HintPath>$(ManagedPath)/UniTask.dll</HintPath>
+      <HintPath>$(LibPath)/UniTask.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="BepInEx">
-      <HintPath>$(GamePath)/BepInEx/core/BepInEx.dll</HintPath>
+      <HintPath>$(LibPath)/BepInEx.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>$(GamePath)/BepInEx/core/0Harmony.dll</HintPath>
+      <HintPath>$(LibPath)/0Harmony.dll</HintPath>
       <Private>false</Private>
     </Reference>
     <Reference Include="LaunchPadBooster">
-      <HintPath>$(GamePath)/BepInEx/plugins/StationeersLaunchPad/LaunchPadBooster.dll</HintPath>
+      <HintPath>$(LibPath)/LaunchPadBooster.dll</HintPath>
       <Private>false</Private>
     </Reference>
   </ItemGroup>

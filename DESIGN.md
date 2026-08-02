@@ -164,9 +164,10 @@ mod/                           # this folder IS the mod
 └── SerialTerminal.dll         # BepInEx-style plugin, loaded by SLP (build output)
 ```
 
-The csproj builds the DLL straight into `mod/`, and `mod/` is symlinked into
-`.../compatdata/544550/pfx/drive_c/users/steamuser/Documents/My Games/Stationeers/mods/SerialTerminal`
-— no deploy step, just build and restart the game. (The game merges recipe/language
+The csproj builds the DLL straight into `mod/`, and `mod/` is symlinked into the
+game's user-data mods folder as `SerialTerminal` — `Documents/My Games/Stationeers/mods`
+on Windows, or the same path under `<proton-prefix>/drive_c/users/steamuser/` when
+running through Proton. No deploy step, just build and restart the game. (The game merges recipe/language
 XML only for real mods in the mods folder — a bare DLL in `BepInEx/plugins` would
 load code but get no recipes/localization.)
 
