@@ -18,8 +18,8 @@ from your own install:
 
     ./setup.sh
 
-It asks Steam where Stationeers is (including libraries on other drives). If
-that fails, name the directory yourself:
+It reads Steam's own library records to find the install, including libraries
+on other drives. If that fails, name the directory yourself:
 
     ./setup.sh /path/to/steamapps/common/Stationeers
 

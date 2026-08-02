@@ -35,26 +35,57 @@ BepInEx/core/0Harmony.dll
 BepInEx/plugins/StationeersLaunchPad/LaunchPadBooster.dll
 "
 
+APP_ID=544550
+
 is_game_dir() {
     [ -f "$1/$MANAGED/Assembly-CSharp.dll" ]
 }
 
-# Steam records every library root in libraryfolders.vdf, including ones on
-# other drives, so ask it rather than guessing at mount points.
-find_in_steam_libraries() {
-    for vdf in \
-        "$HOME/.steam/steam/steamapps/libraryfolders.vdf" \
-        "$HOME/.local/share/Steam/steamapps/libraryfolders.vdf" \
-        "$HOME/Library/Application Support/Steam/steamapps/libraryfolders.vdf"
+# There is no Steam CLI that reports install paths (steamcmd manages its own
+# separate installs), but the client's own bookkeeping is exact: every library
+# entry in libraryfolders.vdf lists the app ids it holds, and each library's
+# appmanifest_<id>.acf names the folder under common/. Read those rather than
+# probing for a directory of the expected name.
+steam_library_configs() {
+    for root in \
+        "$HOME/.steam/steam" \
+        "$HOME/.local/share/Steam" \
+        "$HOME/.steam/root" \
+        "$HOME/Library/Application Support/Steam"
     do
-        [ -f "$vdf" ] || continue
-        sed -n 's/.*"path"[[:space:]]*"\(.*\)".*/\1/p' "$vdf" | while IFS= read -r root; do
-            candidate="$root/steamapps/common/Stationeers"
-            if is_game_dir "$candidate"; then
-                echo "$candidate"
-                break
-            fi
+        for vdf in "$root/steamapps/libraryfolders.vdf" "$root/config/libraryfolders.vdf"; do
+            [ -f "$vdf" ] && echo "$vdf"
         done
+    done
+}
+
+# The library whose "apps" block contains APP_ID; "path" precedes it in the
+# same entry, so the last one seen is this app's library.
+library_holding_app() {
+    awk -v app="\"$APP_ID\"" '
+        /"path"/ {
+            line = $0
+            sub(/^[^"]*"path"[ \t]*"/, "", line)
+            sub(/".*$/, "", line)
+            path = line
+        }
+        $1 == app { print path; exit }
+    ' "$1"
+}
+
+find_in_steam_libraries() {
+    steam_library_configs | while IFS= read -r vdf; do
+        library=$(library_holding_app "$vdf")
+        [ -n "$library" ] || continue
+        manifest="$library/steamapps/appmanifest_$APP_ID.acf"
+        [ -f "$manifest" ] || continue
+        installdir=$(sed -n 's/.*"installdir"[[:space:]]*"\(.*\)".*/\1/p' "$manifest" | head -n 1)
+        [ -n "$installdir" ] || continue
+        candidate="$library/steamapps/common/$installdir"
+        if is_game_dir "$candidate"; then
+            echo "$candidate"
+            break
+        fi
     done
 }
 
