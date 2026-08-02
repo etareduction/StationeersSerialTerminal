@@ -20,18 +20,29 @@ through a memory-mapped UART, players type on it via the in-game keyboard window
 ## Hardware model (what IC10 sees)
 
 The device implements `IMemoryReadable`/`IMemoryWritable`, so vanilla `get`/`put`
-(`getd`/`putd`) work on it. Four registers, modelled on a 6551 ACIA-style memory-mapped UART:
+(`getd`/`putd`) work on it. Six registers, modelled on a 6551 ACIA-style memory-mapped
+UART plus 6845 CRTC-style cursor address registers:
 
 | Addr | Name  | `get` (read)                          | `put` (write)                                  |
 |------|-------|---------------------------------------|------------------------------------------------|
-| 0    | DATA  | pop next input char (0 if empty)      | print one ASCII char (control chars honoured)   |
+| 0    | DATA  | pop input: 1 char, or ≤6 chars packed ASCII-6 in buffered mode (0 if empty) | print: 1 char, or a packed ASCII-6 string in buffered mode |
 | 1    | STR   | peek next input char (no consume)     | print packed ASCII-6 string (`STR("HELLO ")`)  |
 | 2    | COUNT | input chars available                 | — (error)                                       |
-| 3    | CTRL  | status: bit0 = input ready, bit1 = overflow | 1 = clear screen, 2 = flush input, 3 = clear overflow flag |
+| 3    | CTRL  | status: bit0 input ready, bit1 overflow, bit2 output buffered, bit3 input buffered | 1 clear screen, 2 flush input, 3 clear overflow, 4/5 output unbuffered/buffered, 6/7 input unbuffered/buffered |
+| 4    | ROW   | cursor row                            | set cursor row (clamped)                        |
+| 5    | COL   | cursor column                         | set cursor column (clamped)                     |
 
-Control characters on output: `\n`(10) newline, `\r`(13) col 0, `\b`(8) backspace,
-FF(12) clear screen. Screen scrolls up when full. Out-of-range address → vanilla
-`StackOverflow/Underflow` chip exception, exactly like other stack devices.
+Input and output transfer modes are independent and both default to unbuffered
+(byte-at-a-time); buffered mode moves one packed ASCII-6 string (≤6 chars) per
+DATA access. Buffered input packs the earliest-typed char in the highest byte —
+the same layout `STR()` produces — so `UnpackAscii6` round-trips it.
+
+Control characters on output: LF(10) down one row *column unchanged* (scrolls at
+the bottom), CR(13) col 0, NEL(133) = CR+LF in one code, BS(8) cursor left
+(non-destructive, stops at col 0), DEL(127) destructive backspace (BS SP BS in
+one code), FF(12) clear screen. Line wrap at col 40 = CR+LF. Out-of-range
+address → vanilla `StackOverflow/Underflow` chip exception, exactly like other
+stack devices.
 
 Packed ASCII-6 is the vanilla text convention (`ProgrammableChip.PackAscii6/UnpackAscii6`,
 IC10 `STR("...")` literals, LED-display String mode) — 6 chars per double, 53-bit payload.
@@ -44,14 +55,17 @@ Logic types (all vanilla — no LogicType enum patching):
 
 Input buffer: 256-byte FIFO (a generous hardware UART FIFO). On overflow new chars are
 dropped and the overflow flag set — real UART behaviour, and it gives IC programs a
-detectable error state. Player-typed lines are terminated with `\n` (13,10? — just 10).
+detectable error state. Player input is unbuffered: every keystroke goes straight into
+the FIFO (Enter sends CR 13, Backspace sends BS 8 — real terminal keyboard codes; no
+local line editing).
 
 ## Player interaction
 
 Click the screen (`Activate` interactable added to the cloned prefab) → ImGui terminal
 window (`TerminalWindow`, drawn inside the game's own ImGui frame): the fixed cell grid
-mirroring the in-world screen plus an input line at the bottom. Enter → line + `\n` goes
-into the input FIFO. On a client, the line travels to the server via a LaunchPadBooster
+mirroring the in-world screen. No input line — keystrokes are forwarded raw
+(`Input.inputString` per frame, Enter mapped to CR) into the input FIFO. On a client,
+each frame's keystrokes travel to the server via a LaunchPadBooster
 `INetworkMessage` (`TerminalInputMessage { referenceId, text }`); guarded by the standard
 "is local player" check used by `LogicHashGen`. Esc / close button / walking away
 (8 m) closes the window. Input capture uses the same pattern as

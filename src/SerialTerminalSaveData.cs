@@ -20,5 +20,11 @@ namespace SerialTerminal
 
         [XmlElement]
         public bool Overflow;
+
+        [XmlElement]
+        public bool OutputBuffered;
+
+        [XmlElement]
+        public bool InputBuffered;
     }
 }

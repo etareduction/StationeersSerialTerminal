@@ -10,8 +10,9 @@ namespace SerialTerminal
     /// <summary>
     /// The interactive terminal window, drawn in the game's own ImGui context
     /// (hooked from ImguiCreativeSpawnMenu.Draw in Patches.cs). One window at a
-    /// time: a scrollback-less fixed screen (mirroring the in-world surface) with
-    /// an input line at the bottom.
+    /// time: a scrollback-less fixed screen (mirroring the in-world surface).
+    /// Input is unbuffered: every keystroke goes straight to the device FIFO
+    /// (Enter sends CR, Backspace sends BS) — there is no local line editing.
     /// </summary>
     public static class TerminalWindow
     {
@@ -21,7 +22,6 @@ namespace SerialTerminal
 
         private static readonly ImGuiModal Modal = new ImGuiModal();
         private static SerialTerminalDevice _device;
-        private static string _input = string.Empty;
         private static bool _justOpened;
 
         public static void Open(SerialTerminalDevice device)
@@ -40,7 +40,6 @@ namespace SerialTerminal
                 InventoryManager.EnablePlayerKeys = false;
             }
             _device = device;
-            _input = string.Empty;
             _justOpened = true;
         }
 
@@ -117,25 +116,22 @@ namespace SerialTerminal
             {
                 ImGui.TextUnformatted("-- no power --");
             }
+            else
+            {
+                ImGui.TextDisabled("keys go to terminal | Esc closes");
+            }
 
             if (_justOpened)
             {
-                ImGui.SetKeyboardFocusHere();
+                ImGui.SetWindowFocus();
                 _justOpened = false;
-            }
-            ImGui.SetNextItemWidth(-1f);
-            if (ImGui.InputText("##terminalinput", ref _input, 512u,
-                    ImGuiInputTextFlags.EnterReturnsTrue))
-            {
-                if (powered && !string.IsNullOrEmpty(_input))
-                {
-                    device.SubmitLine(_input);
-                }
-                _input = string.Empty;
-                ImGui.SetKeyboardFocusHere(-1);
             }
 
             bool focused = ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
+            if (focused && powered)
+            {
+                SendKeystrokes(device);
+            }
             ImGui.End();
             ImGui.PopStyleColor();
             ImGui.PopFont();
@@ -144,6 +140,30 @@ namespace SerialTerminal
             {
                 Close();
             }
+        }
+
+        /// <summary>
+        /// Forwards this frame's typed characters (Unity legacy input, includes
+        /// OS key repeat) to the device. Enter arrives as '\n' or '\r' depending
+        /// on platform — both are sent as CR (13), like a real terminal keyboard.
+        /// Backspace arrives as '\b' (8) and is sent through unchanged.
+        /// </summary>
+        private static void SendKeystrokes(SerialTerminalDevice device)
+        {
+            string typed = Input.inputString;
+            if (string.IsNullOrEmpty(typed))
+            {
+                return;
+            }
+            char[] chars = typed.ToCharArray();
+            for (int i = 0; i < chars.Length; i++)
+            {
+                if (chars[i] == '\n')
+                {
+                    chars[i] = '\r';
+                }
+            }
+            device.SubmitInput(new string(chars));
         }
 
         private static bool OutOfRange(SerialTerminalDevice device)

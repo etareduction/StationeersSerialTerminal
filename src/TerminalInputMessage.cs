@@ -4,7 +4,7 @@ using LaunchPadBooster.Networking;
 
 namespace SerialTerminal
 {
-    /// <summary>Client → server: a line the player typed into a terminal.</summary>
+    /// <summary>Client → server: raw keystrokes the player typed into a terminal.</summary>
     public class TerminalInputMessage : ModNetworkMessage<TerminalInputMessage>
     {
         public long TerminalId;
@@ -30,7 +30,7 @@ namespace SerialTerminal
             }
             if (Referencable.Exists<SerialTerminalDevice>(TerminalId, out SerialTerminalDevice terminal))
             {
-                terminal.EnqueueInputLine(Text ?? string.Empty);
+                terminal.EnqueueInput(Text ?? string.Empty);
             }
         }
     }

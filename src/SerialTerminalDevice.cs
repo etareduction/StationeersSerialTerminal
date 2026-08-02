@@ -21,21 +21,38 @@ namespace SerialTerminal
 {
     /// <summary>
     /// Norsec TTY-6 serial terminal. A dumb glass teletype: IC10 circuits talk to it
-    /// through a 4-register memory-mapped UART (get/put), players type on it through
-    /// the vanilla keyboard input window.
+    /// through a 6-register memory-mapped UART (get/put), players type on it through
+    /// the terminal window; every keystroke goes straight into the input FIFO.
     /// </summary>
     public class SerialTerminalDevice : LogicDisplay, IMemoryReadable, IMemoryWritable
     {
         // UART register map (see DESIGN.md)
-        private const int ADDR_DATA = 0;   // r: pop input char / w: print char
+        private const int ADDR_DATA = 0;   // r: pop input (char, or packed ascii-6 in buffered mode) / w: print (same)
         private const int ADDR_STR = 1;    // r: peek input char / w: print packed ascii-6
         private const int ADDR_COUNT = 2;  // r: input chars available
-        private const int ADDR_CTRL = 3;   // r: status flags / w: 1 clear screen, 2 flush input, 3 clear overflow
-        private const int REGISTER_COUNT = 4;
+        private const int ADDR_CTRL = 3;   // r: status flags / w: command
+        private const int ADDR_ROW = 4;    // rw: cursor row (clamped)
+        private const int ADDR_COL = 5;    // rw: cursor column (clamped)
+        private const int REGISTER_COUNT = 6;
 
         private const int CTRL_CLEAR_SCREEN = 1;
         private const int CTRL_FLUSH_INPUT = 2;
         private const int CTRL_CLEAR_OVERFLOW = 3;
+        private const int CTRL_OUTPUT_UNBUFFERED = 4;
+        private const int CTRL_OUTPUT_BUFFERED = 5;
+        private const int CTRL_INPUT_UNBUFFERED = 6;
+        private const int CTRL_INPUT_BUFFERED = 7;
+
+        // Control characters honoured on output.
+        private const char CH_BS = '\b';     // 8: cursor left, stops at column 0
+        private const char CH_LF = '\n';     // 10: down one row, column unchanged
+        private const char CH_FF = '\f';     // 12: clear screen, cursor home
+        private const char CH_CR = '\r';     // 13: cursor to column 0
+        private const char CH_DEL = '\u007f'; // 127: destructive backspace (BS SP BS)
+        private const char CH_NEL = '\u0085'; // 133: next line (CR + LF)
+
+        // Max chars per packed ascii-6 double (IC10 STR convention).
+        private const int PackedChars = 6;
 
         public const int Rows = 20;
         public const int Columns = 40;
@@ -53,6 +70,10 @@ namespace SerialTerminal
         private int _cursorRow;
         private int _cursorCol;
         private bool _overflow;
+        // Transfer modes for the DATA register: unbuffered = one char per get/put,
+        // buffered = one packed ascii-6 string (up to 6 chars) per get/put.
+        private bool _outputBuffered;
+        private bool _inputBuffered;
         // Input queue count as last synced from the server. _rx itself only lives
         // where the simulation runs; remote clients need this for tooltips/logic reads.
         private int _syncedRxCount;
@@ -161,16 +182,38 @@ namespace SerialTerminal
                     case ADDR_DATA:
                     {
                         if (_rx.Count == 0) return 0;
-                        char c = _rx.Dequeue();
+                        double result;
+                        if (_inputBuffered)
+                        {
+                            // Pop up to 6 chars, packed ascii-6 (first typed char in
+                            // the highest byte, same layout as STR("...")).
+                            long packed = 0;
+                            for (int i = 0; i < PackedChars && _rx.Count > 0; i++)
+                            {
+                                packed = (packed << 8) | (byte)_rx.Dequeue();
+                            }
+                            result = packed;
+                        }
+                        else
+                        {
+                            result = _rx.Dequeue();
+                        }
                         MarkScreenDirty();
-                        return c;
+                        return result;
                     }
                     case ADDR_STR:
                         return _rx.Count > 0 ? _rx.Peek() : 0;
                     case ADDR_COUNT:
                         return _rx.Count;
                     case ADDR_CTRL:
-                        return (_rx.Count > 0 ? 1 : 0) | (_overflow ? 2 : 0);
+                        return (_rx.Count > 0 ? 1 : 0)
+                            | (_overflow ? 2 : 0)
+                            | (_outputBuffered ? 4 : 0)
+                            | (_inputBuffered ? 8 : 0);
+                    case ADDR_ROW:
+                        return _cursorRow;
+                    case ADDR_COL:
+                        return _cursorCol;
                     default:
                         throw new StackUnderflowException();
                 }
@@ -185,6 +228,11 @@ namespace SerialTerminal
                 {
                     case ADDR_DATA:
                     {
+                        if (_outputBuffered)
+                        {
+                            PutString(ProgrammableChip.UnpackAscii6(value, signed: true));
+                            break;
+                        }
                         int code = (int)value;
                         if (code > 0 && code < 256) PutChar((char)code);
                         break;
@@ -200,7 +248,17 @@ namespace SerialTerminal
                             case CTRL_CLEAR_SCREEN: ClearScreen(); break;
                             case CTRL_FLUSH_INPUT: _rx.Clear(); _overflow = false; break;
                             case CTRL_CLEAR_OVERFLOW: _overflow = false; break;
+                            case CTRL_OUTPUT_UNBUFFERED: _outputBuffered = false; break;
+                            case CTRL_OUTPUT_BUFFERED: _outputBuffered = true; break;
+                            case CTRL_INPUT_UNBUFFERED: _inputBuffered = false; break;
+                            case CTRL_INPUT_BUFFERED: _inputBuffered = true; break;
                         }
+                        break;
+                    case ADDR_ROW:
+                        _cursorRow = Mathf.Clamp((int)value, 0, _rows - 1);
+                        break;
+                    case ADDR_COL:
+                        _cursorCol = Mathf.Clamp((int)value, 0, _cols - 1);
                         break;
                     default:
                         throw new StackOverflowException();
@@ -216,6 +274,8 @@ namespace SerialTerminal
                 ClearScreen();
                 _rx.Clear();
                 _overflow = false;
+                _outputBuffered = false;
+                _inputBuffered = false;
             }
             MarkScreenDirty();
         }
@@ -234,30 +294,43 @@ namespace SerialTerminal
         {
             switch (c)
             {
-                case '\n':
-                    NewLine();
+                case CH_LF:
+                    LineFeed();
                     return;
-                case '\r':
+                case CH_CR:
                     _cursorCol = 0;
                     return;
-                case '\b':
-                    if (_cursorCol > 0) _cursorCol--;
-                    else if (_cursorRow > 0) { _cursorRow--; _cursorCol = _cols - 1; }
-                    _cells[_cursorRow * _cols + _cursorCol] = ' ';
+                case CH_NEL:
+                    _cursorCol = 0;
+                    LineFeed();
                     return;
-                case '\f':
+                case CH_BS:
+                    if (_cursorCol > 0) _cursorCol--;
+                    return;
+                case CH_DEL:
+                    if (_cursorCol > 0)
+                    {
+                        _cursorCol--;
+                        _cells[_cursorRow * _cols + _cursorCol] = ' ';
+                    }
+                    return;
+                case CH_FF:
                     ClearScreen();
                     return;
             }
             if (c < ' ') return;
             _cells[_cursorRow * _cols + _cursorCol] = c;
             _cursorCol++;
-            if (_cursorCol >= _cols) NewLine();
+            if (_cursorCol >= _cols)
+            {
+                _cursorCol = 0;
+                LineFeed();
+            }
         }
 
-        private void NewLine()
+        /// <summary>Cursor down one row, column unchanged; scrolls at the bottom.</summary>
+        private void LineFeed()
         {
-            _cursorCol = 0;
             _cursorRow++;
             if (_cursorRow < _rows) return;
             _cursorRow = _rows - 1;
@@ -320,13 +393,13 @@ namespace SerialTerminal
                 && source.OrganBrain.ClientId == local.OrganBrain.ClientId;
         }
 
-        /// <summary>Local player typed a line in the terminal window.</summary>
-        public void SubmitLine(string text)
+        /// <summary>Local player pressed keys in the terminal window (raw, unbuffered).</summary>
+        public void SubmitInput(string text)
         {
-            if (text == null) return;
+            if (string.IsNullOrEmpty(text)) return;
             if (GameManager.RunSimulation)
             {
-                EnqueueInputLine(text);
+                EnqueueInput(text);
             }
             else
             {
@@ -338,12 +411,12 @@ namespace SerialTerminal
             }
         }
 
-        /// <summary>Server side: queue a typed line (with trailing newline) into the input FIFO.</summary>
-        public void EnqueueInputLine(string text)
+        /// <summary>Server side: queue raw keystrokes into the input FIFO, as-is.</summary>
+        public void EnqueueInput(string text)
         {
             lock (_stateLock)
             {
-                foreach (char raw in text + "\n")
+                foreach (char raw in text)
                 {
                     char c = raw > '\u007f' ? '?' : raw;
                     if (_rx.Count >= RxCapacity)
@@ -506,10 +579,12 @@ namespace SerialTerminal
                 lock (_stateLock)
                 {
                     data.ScreenText = ScreenToString();
-                    data.InputBuffer = new string(_rx.ToArray()).Replace("\n", "\\n");
+                    data.InputBuffer = EscapeBuffer(new string(_rx.ToArray()));
                     data.CursorRow = _cursorRow;
                     data.CursorCol = _cursorCol;
                     data.Overflow = _overflow;
+                    data.OutputBuffered = _outputBuffered;
+                    data.InputBuffered = _inputBuffered;
                 }
             }
         }
@@ -525,10 +600,12 @@ namespace SerialTerminal
                     _cursorRow = Mathf.Clamp(data.CursorRow, 0, _rows - 1);
                     _cursorCol = Mathf.Clamp(data.CursorCol, 0, _cols - 1);
                     _overflow = data.Overflow;
+                    _outputBuffered = data.OutputBuffered;
+                    _inputBuffered = data.InputBuffered;
                     _rx.Clear();
                     if (!string.IsNullOrEmpty(data.InputBuffer))
                     {
-                        foreach (char c in data.InputBuffer.Replace("\\n", "\n"))
+                        foreach (char c in UnescapeBuffer(data.InputBuffer))
                         {
                             if (_rx.Count < RxCapacity) _rx.Enqueue(c);
                         }
@@ -539,6 +616,52 @@ namespace SerialTerminal
         }
 
         #endregion
+
+        // Control characters are not valid in XML 1.0, so the saved input FIFO
+        // escapes them as \xNN (plus \\ for a literal backslash). Legacy saves
+        // used \n for newlines; UnescapeBuffer still accepts that.
+        private static string EscapeBuffer(string text)
+        {
+            StringBuilder sb = new StringBuilder(text.Length);
+            foreach (char c in text)
+            {
+                if (c == '\\') sb.Append("\\\\");
+                else if (c < ' ' || c == CH_DEL) sb.Append("\\x").Append(((int)c).ToString("x2"));
+                else sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
+        private static string UnescapeBuffer(string text)
+        {
+            StringBuilder sb = new StringBuilder(text.Length);
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+                if (c != '\\' || i == text.Length - 1)
+                {
+                    sb.Append(c);
+                    continue;
+                }
+                char next = text[++i];
+                switch (next)
+                {
+                    case '\\': sb.Append('\\'); break;
+                    case 'n': sb.Append('\n'); break;
+                    case 'x':
+                        if (i + 2 < text.Length
+                            && int.TryParse(text.Substring(i + 1, 2),
+                                System.Globalization.NumberStyles.HexNumber, null, out int code))
+                        {
+                            sb.Append((char)code);
+                            i += 2;
+                        }
+                        break;
+                    default: sb.Append(next); break;
+                }
+            }
+            return sb.ToString();
+        }
 
         #region Screen <-> string (callers must hold _stateLock)
 
