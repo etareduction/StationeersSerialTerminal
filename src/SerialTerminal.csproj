@@ -8,6 +8,8 @@
     <Version>0.3.0</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Build straight into mod/ so that folder IS the deployable mod and can be symlinked into the game. -->
+    <OutputPath>$(MSBuildProjectDirectory)/../mod/</OutputPath>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DebugType>none</DebugType>
     <GamePath>/mnt/990/steam/steamapps/common/Stationeers</GamePath>
