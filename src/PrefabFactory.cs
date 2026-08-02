@@ -9,6 +9,7 @@ using Assets.Scripts.Objects;
 using Assets.Scripts.Objects.Electrical;
 using Assets.Scripts.Objects.Items;
 using Assets.Scripts.Sound;
+using LaunchPadBooster.Utils;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -55,7 +56,7 @@ namespace SerialTerminal
             }
 
             Structure sourceStructure = FindSourceStructure();
-            MultiConstructor sourceKit = FindPrefab<MultiConstructor>(SourceKitName);
+            MultiConstructor sourceKit = PrefabUtils.FindPrefab<MultiConstructor>(SourceKitName);
             if (sourceStructure == null || sourceKit == null)
             {
                 SerialTerminalPlugin.Log.LogError(
@@ -81,8 +82,13 @@ namespace SerialTerminal
                     }
                 }
 
-                sourcePrefabs.Add(terminal);
-                sourcePrefabs.Add(kit);
+                // AddPrefabs registers with the SDK (flags the mod as required for
+                // multiplayer join validation) and appends to SourcePrefabs on the
+                // NEXT Prefab.LoadAll - our prefix is inside the current one, so the
+                // direct adds below cover it. Both sides dedupe.
+                SerialTerminalPlugin.MOD.AddPrefabs(new[] { terminal.gameObject, kit.gameObject });
+                if (!sourcePrefabs.Contains(terminal)) sourcePrefabs.Add(terminal);
+                if (!sourcePrefabs.Contains(kit)) sourcePrefabs.Add(kit);
                 _created = true;
                 SerialTerminalPlugin.Log.LogInfo(
                     $"Registered {TerminalPrefabName} ({terminal.PrefabHash}) and {KitPrefabName} ({kit.PrefabHash})");
@@ -95,18 +101,11 @@ namespace SerialTerminal
             }
         }
 
-        private static T FindPrefab<T>(string prefabName) where T : Thing
-        {
-            int hash = Animator.StringToHash(prefabName);
-            return WorldManager.Instance.SourcePrefabs.Find(
-                p => p != null && p.PrefabHash == hash) as T;
-        }
-
         private static Structure FindSourceStructure()
         {
             foreach (string name in SourcePrefabFallbacks)
             {
-                Structure structure = FindPrefab<Structure>(name);
+                Structure structure = PrefabUtils.FindPrefab<Structure>(name);
                 if (structure != null)
                 {
                     SerialTerminalPlugin.Log.LogInfo("Cloning prefab " + name);
@@ -135,6 +134,7 @@ namespace SerialTerminal
             TerminalScreenBehaviour screen = go.AddComponent<TerminalScreenBehaviour>();
             CaptureScreenAnchor(old, screen);
             CopySmartRotation(old, device);
+            EnsureDigitTransform(device, go);
 
             Object.DestroyImmediate(old);
 
@@ -193,6 +193,23 @@ namespace SerialTerminal
         }
 
 
+        /// <summary>
+        /// LogicDisplay.SetDisplay positions its digit glyphs via DigitTransform and
+        /// dereferences it unconditionally. The glyphs never draw (the device vetoes
+        /// the digit renderer's pool in OnAddToPool), but clones of non-LogicDisplay
+        /// sources (Computer) leave the field null, so give it a throwaway anchor.
+        /// </summary>
+        private static void EnsureDigitTransform(SerialTerminalDevice device, GameObject go)
+        {
+            if (device.DigitTransform != null)
+            {
+                return;
+            }
+            GameObject anchor = new GameObject("SerialTerminalDigitAnchor");
+            anchor.transform.SetParent(go.transform, worldPositionStays: false);
+            device.DigitTransform = anchor.transform;
+        }
+
         private static MultiConstructor CreateKit(MultiConstructor source, Structure constructable)
         {
             GameObject go = Object.Instantiate(source.gameObject, _root.transform);
@@ -228,7 +245,7 @@ namespace SerialTerminal
                 foreach (FieldInfo field in type.GetFields(
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                 {
-                    if (field.IsStatic || field.IsInitOnly || field.IsLiteral)
+                    if (field.IsStatic || field.IsInitOnly)
                     {
                         continue;
                     }
@@ -298,7 +315,7 @@ namespace SerialTerminal
                 foreach (FieldInfo field in type.GetFields(
                     BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
                 {
-                    if (field.IsStatic || field.IsLiteral)
+                    if (field.IsStatic)
                     {
                         continue;
                     }
@@ -416,47 +433,14 @@ namespace SerialTerminal
         /// click the terminal and type. Prefers the dedicated screen collider; falls
         /// back to the largest collider no other interactable uses.
         /// </summary>
-        private static void EnsureActivateInteractable(SerialTerminalDevice device, Collider preferred = null)
+        private static void EnsureActivateInteractable(SerialTerminalDevice device, Collider preferred)
         {
             if (device.Interactables.Exists(i => i.Action == InteractableType.Activate))
             {
                 return;
             }
-            if (preferred != null)
-            {
-                device.Interactables.Add(new Interactable
-                {
-                    Parent = device,
-                    Action = InteractableType.Activate,
-                    Collider = preferred
-                });
-                return;
-            }
-            HashSet<Collider> used = new HashSet<Collider>();
-            foreach (Interactable interactable in device.Interactables)
-            {
-                if (interactable.Collider != null)
-                {
-                    used.Add(interactable.Collider);
-                }
-            }
-            Collider screen = null;
-            float best = 0f;
-            foreach (Collider collider in device.GetComponentsInChildren<Collider>(includeInactive: true))
-            {
-                if (used.Contains(collider))
-                {
-                    continue;
-                }
-                Vector3 size = collider.bounds.size;
-                float area = size.x * size.y + size.y * size.z + size.x * size.z;
-                if (screen == null || area > best)
-                {
-                    screen = collider;
-                    best = area;
-                }
-            }
-            if (screen == null)
+            Collider target = preferred != null ? preferred : FindLargestUnusedCollider(device);
+            if (target == null)
             {
                 SerialTerminalPlugin.Log.LogWarning("No collider found for the Activate interaction; typing will be unavailable");
                 return;
@@ -465,8 +449,37 @@ namespace SerialTerminal
             {
                 Parent = device,
                 Action = InteractableType.Activate,
-                Collider = screen
+                Collider = target
             });
+        }
+
+        private static Collider FindLargestUnusedCollider(SerialTerminalDevice device)
+        {
+            HashSet<Collider> used = new HashSet<Collider>();
+            foreach (Interactable interactable in device.Interactables)
+            {
+                if (interactable.Collider != null)
+                {
+                    used.Add(interactable.Collider);
+                }
+            }
+            Collider best = null;
+            float bestArea = 0f;
+            foreach (Collider collider in device.GetComponentsInChildren<Collider>(includeInactive: true))
+            {
+                if (used.Contains(collider))
+                {
+                    continue;
+                }
+                Vector3 size = collider.bounds.size;
+                float area = size.x * size.y + size.y * size.z + size.x * size.z;
+                if (best == null || area > bestArea)
+                {
+                    best = collider;
+                    bestArea = area;
+                }
+            }
+            return best;
         }
 
         private static void CloneExternalBlueprint(Thing thing, GameObject owner)

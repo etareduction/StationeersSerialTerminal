@@ -108,10 +108,14 @@ namespace SerialTerminal
             return true;
         }
 
-        /// <summary>Creates a renderer (own mesh + material) for one terminal screen.</summary>
+        /// <summary>
+        /// Creates a renderer (own mesh + material) for one terminal screen.
+        /// Caller must have ensured the context (EnsureContext); a null return
+        /// here means the shader resources are missing - a permanent failure.
+        /// </summary>
         public static ImGuiRendererMesh CreateRenderer()
         {
-            if (!EnsureContext())
+            if (_context == IntPtr.Zero)
             {
                 return null;
             }
@@ -213,13 +217,16 @@ namespace SerialTerminal
         public float ScreenWorldWidth;
         public float ScreenWorldHeight;
 
+        // One quad geometry for every terminal instance; per-device state is the
+        // RenderTexture/material, not the mesh. Never destroyed.
+        private static Mesh _sharedQuadMesh;
+
         private SerialTerminalDevice _device;
         private RenderTexture _texture;
         private CommandBuffer _commandBuffer;
         private ImGuiRendererMesh _renderer;
         private MeshRenderer _quadRenderer;
         private Material _material;
-        private Mesh _quadMesh;
         private int _renderedVersion = -1;
         private bool _setupFailed;
 
@@ -335,8 +342,11 @@ namespace SerialTerminal
             quad.transform.position = anchor.position + anchor.forward * 0.002f;
             quad.transform.rotation = anchor.rotation;
             quad.transform.localScale = new Vector3(width, height, 1f);
-            _quadMesh = BuildDoubleSidedQuad();
-            quad.AddComponent<MeshFilter>().sharedMesh = _quadMesh;
+            if (_sharedQuadMesh == null)
+            {
+                _sharedQuadMesh = BuildDoubleSidedQuad();
+            }
+            quad.AddComponent<MeshFilter>().sharedMesh = _sharedQuadMesh;
 
             _quadRenderer = quad.AddComponent<MeshRenderer>();
             _quadRenderer.sharedMaterial = _material;
@@ -412,11 +422,6 @@ namespace SerialTerminal
             {
                 Object.Destroy(_material);
                 _material = null;
-            }
-            if (_quadMesh != null)
-            {
-                Object.Destroy(_quadMesh);
-                _quadMesh = null;
             }
         }
     }

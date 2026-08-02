@@ -6,16 +6,16 @@
     <RecordThing>
       <Key>StructureSerialTerminal</Key>
       <Value>Serial Terminal</Value>
-      <Description>The Norsec TTY-6 'Teletype' is a deliberately dumb glass terminal: no processor, no storage, just a phosphor-bright character display and a keyboard controller wired to a 6-register serial UART. Any {THING:StructureCircuitHousing;IC Housing} can drive it with the get and put instructions.
+      <Description>The Norsec TTY-6 'Teletype' looks like a proper computer - free-standing desk unit, monitor and keyboard - but it is a deliberately dumb glass terminal: no processor, no storage, just a phosphor-bright 40x20 character display and a keyboard controller wired to a 6-register serial UART. Any {THING:StructureCircuitHousing;IC Housing} can drive it with the get and put instructions.
 
-Registers: 0 DATA (put: print an ASCII character; get: pop the next typed character, 0 if none - or a packed 6-character string per access in buffered mode), 1 STRING (put: print a packed 6-character string, e.g. put d0 1 STR("HELLO "); get: peek next typed character), 2 COUNT (get: characters waiting in the 256-byte input buffer), 3 CONTROL (put 1: clear screen, 2: flush input, 3: clear the overflow flag, 4/5: output unbuffered/buffered, 6/7: input unbuffered/buffered; get: status bits), 4 ROW and 5 COL (cursor address, read/write).
+Registers: 0 DATA (put: print an ASCII character; get: pop the next typed character, 0 if none - or a packed 6-character string per access in buffered mode), 1 STRING (put: print a packed 6-character string, e.g. put d0 1 STR("HELLO "); get: peek next typed character), 2 COUNT (get: characters waiting in the 256-byte input buffer), 3 CONTROL (put 1: clear screen, 2: flush input, 3: clear the overflow flag, 4/5: output unbuffered/buffered, 6/7: input unbuffered/buffered, 8/9: local echo off/on; get: status bits), 4 ROW and 5 COL (cursor address, read/write).
 
-Control codes: 8 backspace, 10 line feed, 12 clear screen, 13 carriage return, 127 destructive backspace, 133 new line (CR+LF). Writing the Setting logic variable prints a packed string. Quantity reports input waiting, Error reports input-buffer overflow. Click the screen to type: every keystroke goes straight to the wire (Enter sends 13, Backspace sends 8) and the terminal never echoes locally - what appears on the glass is exactly what the circuit prints, like any honest teletype since the dawn of the space age.</Description>
+Control codes: 8 backspace, 10 line feed, 12 clear screen, 13 carriage return, 127 destructive backspace, 133 new line (CR+LF). Memory is volatile: switching the terminal off or cutting its power wipes the screen, input buffer and every mode. Writing the Setting logic variable prints a packed string. Quantity reports input waiting, Error reports input-buffer overflow. Click the screen to type: every keystroke goes straight to the wire (Enter sends 13, Backspace sends 8). Full duplex by default - what appears on the glass is exactly what the circuit prints, like any honest teletype since the dawn of the space age; flip it half duplex (put 3 9) and the keyboard echoes to the glass instantly, no circuit required.</Description>
     </RecordThing>
     <RecordThing>
       <Key>ItemKitSerialTerminal</Key>
       <Value>Kit (Serial Terminal)</Value>
-      <Description>This kit places a Norsec TTY-6 Serial Terminal, a wall-mounted character display and keyboard readable and writable by IC10 circuits.</Description>
+      <Description>This kit places a Norsec TTY-6 Serial Terminal, a free-standing monitor-and-keyboard computer block readable and writable by IC10 circuits.</Description>
     </RecordThing>
   </Things>
 </Language>

@@ -1,14 +1,18 @@
 # Serial Terminal — Design
 
-A wall-mounted serial terminal for Stationeers: IC10 circuits read/write ASCII characters
-through a memory-mapped UART, players type on it via the in-game keyboard window.
+A serial terminal for Stationeers — a free-standing PC-style monitor-and-keyboard
+block (the "Computer (Modern)" form factor): IC10 circuits read/write ASCII
+characters through a memory-mapped UART, players type on it directly, one
+keystroke at a time.
 
 ## Fiction / balance
 
 - **Norsec TTY-6 "Teletype"** — Norsec (Northern Security Systems) is the vanilla
   logic/computing manufacturer (Logic Motherboard, Sorter Motherboard are "Norsec K-cops").
-  A dumb serial terminal fits their catalogue and the game's retro-futurist tone: it is
-  deliberately *not* a general-purpose computer, just a glass teletype like a 1970s ADM-3A.
+  A dumb serial terminal fits their catalogue and the game's retro-futurist tone: it
+  *looks* like a full computer — desk unit, monitor, keyboard — but is deliberately
+  *not* one, just a glass teletype like a 1970s ADM-3A: display + keyboard + UART,
+  no processor, no storage.
 - Power draw **50 W** — the vanilla convention for every display/console/IC housing.
 - Built from **Kit (Serial Terminal)** `ItemKitSerialTerminal`, printed on the
   **Electronics Printer, Tier 1**: `10 Copper, 5 Gold, 2 Steel, 2 Solder, 40 s, 3000 J`
@@ -28,7 +32,7 @@ UART plus 6845 CRTC-style cursor address registers:
 | 0    | DATA  | pop input: 1 char, or ≤6 chars packed ASCII-6 in buffered mode (0 if empty) | print: 1 char, or a packed ASCII-6 string in buffered mode |
 | 1    | STR   | peek next input char (no consume)     | print packed ASCII-6 string (`STR("HELLO ")`)  |
 | 2    | COUNT | input chars available                 | — (error)                                       |
-| 3    | CTRL  | status: bit0 input ready, bit1 overflow, bit2 output buffered, bit3 input buffered | 1 clear screen, 2 flush input, 3 clear overflow, 4/5 output unbuffered/buffered, 6/7 input unbuffered/buffered |
+| 3    | CTRL  | status: bit0 input ready, bit1 overflow, bit2 output buffered, bit3 input buffered, bit4 local echo | 1 clear screen, 2 flush input, 3 clear overflow, 4/5 output unbuffered/buffered, 6/7 input unbuffered/buffered, 8/9 local echo off/on |
 | 4    | ROW   | cursor row                            | set cursor row (clamped)                        |
 | 5    | COL   | cursor column                         | set cursor column (clamped)                     |
 
@@ -59,6 +63,18 @@ detectable error state. Player input is unbuffered: every keystroke goes straigh
 the FIFO (Enter sends CR 13, Backspace sends BS 8 — real terminal keyboard codes; no
 local line editing).
 
+The terminal has no NVRAM: leaving the operating state (switched off or power
+lost, tracked via `OnInteractableUpdated` OnOff/Powered transitions, server-side)
+runs the same full reset as `clr`. State persists across save/load only while
+powered (`_wasOperating` is re-derived from the restored interactable states on
+deserialize).
+
+Local echo (CTRL 8/9, default off) is the ADM-3A HALF/FULL DUPLEX switch: in half
+duplex the keyboard controller prints keystrokes device-side the moment they arrive
+(printables as-is, CR → NEL, BS → DEL), bypassing the IC10 tick (2 Hz) entirely so
+typing feels instant. Echo happens even when the FIFO is full — the glass is wired
+to the keyboard, not the host.
+
 ## Player interaction
 
 Click the screen (`Activate` interactable added to the cloned prefab) → ImGui terminal
@@ -77,20 +93,28 @@ the game's own creative spawn menu: `KeyManager.SetInputState(..., Typing)` +
 The game ships Dear ImGui (`RG.ImGui.dll`, `RG.ImGui.Unity.dll`) and drives one
 screen-overlay context from `ImGuiManager.LateUpdate`. Two uses here:
 
-- **Interactive window**: Harmony postfix on `ImguiCreativeSpawnMenu.Draw` (same hook
-  the IC10Editor mod uses) draws `TerminalWindow` inside the game's frame.
-- **In-world console surface**: `OffscreenImGui` creates a *second* ImGui context with
+- **Interactive window**: `TerminalWindow` subclasses the game's
+  `UI.ImGuiUi.ImGuiWindows.ImGuiWindow` and registers with `ImGuiWindowManager`
+  (drawn every frame from `ImGuiManager.RenderOverlay`; the manager also owns the
+  Typing input state and mouse-pointer mode). A `MouseModeController` modal keeps
+  the cursor unlocked, and `InventoryManager.EnablePlayerKeys` stays off while open.
+- **In-world monitor surface**: `OffscreenImGui` creates a *second* ImGui context with
   `ImGui.CreateContext(sharedFontAtlas)` so it shares the game's font atlas (and thus
   texture IDs in `ImGuiManager.igTextureManager`). Each terminal gets its own
-  `ImGuiRendererMesh` + `CommandBuffer` + square `RenderTexture`, shown on a quad
-  parented to the display's `DigitTransform`. `TerminalScreenBehaviour` repaints the
-  texture only when the device's screen version changes — zero cost while idle.
-  Font scale is computed per repaint so the whole cell grid fills the texture.
+  `ImGuiRendererMesh` + `CommandBuffer` + `RenderTexture`, shown on a double-sided
+  quad placed at the monitor face — pose and size captured at prefab build from the
+  vanilla Computer's `ComputerScreen` world-space canvas (then deactivated), stored
+  in `TerminalScreenBehaviour.ScreenAnchor/ScreenWorldWidth/Height`.
+  `TerminalScreenBehaviour` repaints the texture only when the device's screen
+  version changes — zero cost while idle. Font scale is computed per repaint so the
+  whole cell grid fills the texture.
 
 The screen buffer keeps a monotonically increasing `ScreenVersion`;
 `SnapshotLines()` returns a cached main-thread copy rebuilt only on version change.
-`LogicDisplay.SetDisplay` stays prefix-blocked so the vanilla numeric readout can
-never repopulate the digit glyph list (cleared once in `Awake`).
+The vanilla numeric readout draws only for displays in
+`LogicDisplayDigitRenderer.ActiveDisplays`; `SerialTerminalDevice.OnAddToPool`
+vetoes membership in that pool, so `SetDisplay` may run (it needs the dummy
+`DigitTransform` the factory assigns) but its glyphs are never rendered.
 
 ## Implementation strategy (no Unity editor, no asset bundles)
 
@@ -98,22 +122,28 @@ Clone-and-swap, per the community "Mirrored Devices" pattern (StationeersPlus re
 FPGA mod conventions):
 
 1. Harmony prefix on `Prefab.LoadAll`:
-   - Clone `StructureConsoleLED1x2` (LED Display Medium) under a hidden DontDestroyOnLoad parent.
-   - Replace its `LogicDisplay` component with `SerialTerminal : LogicDisplay` (field-copy via
-     reflection, then fix `Interactables[].Parent`, slot/collider back-references).
+   - Clone `StructureComputer` ("Computer (Modern)" — the free-standing
+     monitor-and-keyboard block; `StructureConsoleLED5Large`/`StructureConsoleLED1x2`
+     are fallbacks) under a hidden DontDestroyOnLoad parent.
+   - Replace its device component with `SerialTerminalDevice : LogicDisplay`
+     (field-copy of the shared base-class chain via reflection, then fix
+     `Interactables[].Parent`, slot/collider back-references; interface backing
+     fields like `ISmartRotatable` copied explicitly).
    - `PrefabName = "StructureSerialTerminal"`, `PrefabHash = Animator.StringToHash(name)`.
-   - Clone `ItemKitConsole` → `ItemKitSerialTerminal`, `Constructables = [terminal]`,
+   - Clone `ItemKitComputer` → `ItemKitSerialTerminal`, `Constructables = [terminal]`,
      wire `BuildStates[0].Tool.ToolExit` to the new kit.
-   - Add both to `WorldManager.Instance.SourcePrefabs`.
-2. Rendering: `LogicDisplay` subclass reuses the batched glyph renderer
-   (`LogicDisplayDigitRenderer` draws `DigitGlyphs`; offsets are full Vector3 → multi-row
-   layout; `DigitTransform.localScale` shrinks glyphs). Override `SetDisplay` so every
-   vanilla repaint path renders the terminal grid instead of the numeric readout.
-   Grid is fixed at 20×40 (constants in `SerialTerminalDevice`; no config).
-   Chars without a glyph mesh fall back to uppercase, then '?'.
+   - Register both via `Mod.AddPrefabs` (SDK bookkeeping: join validation) and add
+     to `WorldManager.Instance.SourcePrefabs` directly for the current `LoadAll`.
+     This `Prefab.LoadAll` prefix is the mod's only Harmony patch.
+2. Rendering: ImGui on a RenderTexture quad over the monitor face (see the ImGui
+   section above); the vanilla numeric readout is suppressed by the `OnAddToPool`
+   veto (no patch). Grid is fixed at 20×40 (constants in `SerialTerminalDevice`;
+   no config).
 3. Sync/persistence:
-   - Server→client: screen text + flags on a spare `NetworkUpdateFlags` bit (512) in
-     `BuildUpdate`/`ProcessUpdate` + join serialization.
+   - Server→client on class-specific `NetworkUpdateFlags` bits in
+     `BuildUpdate`/`ProcessUpdate` + join serialization: screen text + cursor
+     (bit 1024) and FIFO count + overflow (bit 2048), so draining input never
+     resends the unchanged screen.
    - Save: `SerialTerminalSaveData : LogicBaseSaveData` registered through
      LaunchPadBooster `Mod.AddSaveDataType<T>()`.
    - `WriteMemory`/`ReadMemory` run on the sim thread; rendering marshalled to the main
@@ -126,16 +156,19 @@ FPGA mod conventions):
 ## Shipping layout (StationeersLaunchPad local mod)
 
 ```
-SerialTerminal/
+mod/                           # this folder IS the mod
 ├── About/About.xml            # ModMetadata
+├── API.md                     # device API reference
 ├── GameData/serialterminal.xml        # printer recipe
 ├── GameData/Language/english.xml      # names + Stationpedia descriptions
-└── SerialTerminal.dll         # BepInEx-style plugin, loaded by SLP
+└── SerialTerminal.dll         # BepInEx-style plugin, loaded by SLP (build output)
 ```
 
-Deployed to `.../compatdata/544550/pfx/drive_c/users/steamuser/Documents/My Games/Stationeers/mods/`
-(the game merges recipe/language XML only for real mods in the mods folder — a bare DLL in
-`BepInEx/plugins` would load code but get no recipes/localization).
+The csproj builds the DLL straight into `mod/`, and `mod/` is symlinked into
+`.../compatdata/544550/pfx/drive_c/users/steamuser/Documents/My Games/Stationeers/mods/SerialTerminal`
+— no deploy step, just build and restart the game. (The game merges recipe/language
+XML only for real mods in the mods folder — a bare DLL in `BepInEx/plugins` would
+load code but get no recipes/localization.)
 
 ## IC10 usage example
 
@@ -143,11 +176,18 @@ Deployed to `.../compatdata/544550/pfx/drive_c/users/steamuser/Documents/My Game
 alias term d0
 # print a prompt
 put term 1 STR("READY.")
-put term 0 10          # newline
+put term 0 133         # NEL: newline (CR+LF)
 loop:
+yield
 l r0 term Quantity     # chars waiting?
 blez r0 loop
-get r1 term 0          # pop char
+get r1 term 0          # pop keystroke (Enter = CR 13, Backspace = BS 8)
+bne r1 13 print
+move r1 133            # echo Enter as a full newline
+print:
 put term 0 r1          # echo it back
 j loop
 ```
+
+More complete examples (rubout handling, buffered mode, cursor addressing) live in
+`examples/`.

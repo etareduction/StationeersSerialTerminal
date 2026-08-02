@@ -30,7 +30,8 @@ namespace SerialTerminal
             }
             if (Referencable.Exists<SerialTerminalDevice>(TerminalId, out SerialTerminalDevice terminal))
             {
-                terminal.EnqueueInput(Text ?? string.Empty);
+                // Deserialize ran before Process, so Text is never null here.
+                terminal.EnqueueInput(Text);
             }
         }
     }

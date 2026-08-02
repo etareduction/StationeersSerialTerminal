@@ -1,9 +1,10 @@
 # Norsec TTY-6 Serial Terminal — Device API
 
-The TTY-6 (`StructureSerialTerminal`, built from `ItemKitSerialTerminal`) is a dumb
-glass teletype: no processor, no storage — just a character display and a keyboard
-controller wired to a 6-register memory-mapped UART. Any IC10 housing on the same
-data network can drive it with `get`/`put`.
+The TTY-6 (`StructureSerialTerminal`, built from `ItemKitSerialTerminal`) is a
+free-standing computer block — desk unit, monitor and keyboard — that is secretly
+a dumb glass teletype: no processor, no storage, just a character display and a
+keyboard controller wired to a 6-register memory-mapped UART. Any IC10 housing on
+the same data network can drive it with `get`/`put`.
 
 ## Screen
 
@@ -13,8 +14,10 @@ data network can drive it with `get`/`put`.
 - Full printable ASCII (32–126; codes 128–255 except 133 also print if the UI font
   has a glyph for them). The same content is shown on the in-world monitor and in
   the terminal window (click the screen to open).
-- Screen contents, cursor, transfer modes and the input buffer survive save/load;
-  the screen is synced to all clients.
+- The terminal's memory is **volatile**: switching it off or losing power wipes
+  everything — screen, cursor, input FIFO, overflow flag and all modes. A power
+  cycle is a full reset. State survives save/load only while the terminal stays
+  powered. The screen is synced to all clients.
 
 ## UART registers (`get`/`put`)
 
@@ -31,7 +34,7 @@ data network can drive it with `get`/`put`.
 
 The IC10 `clr` instruction (clear device stack) resets the whole terminal:
 clears the screen, discards the input FIFO, clears the overflow flag and returns
-both transfer modes to unbuffered.
+all modes (transfer modes, local echo) to defaults. A power cycle does the same.
 
 ### Transfer modes
 
@@ -58,6 +61,8 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 | 5    | `CTRL_OUTPUT_BUFFERED`  | DATA writes print a packed string      |
 | 6    | `CTRL_INPUT_UNBUFFERED` | DATA reads pop one char (default)      |
 | 7    | `CTRL_INPUT_BUFFERED`   | DATA reads pop up to 6 chars, packed   |
+| 8    | `CTRL_ECHO_OFF`         | Full duplex: no local echo (default)   |
+| 9    | `CTRL_ECHO_ON`          | Half duplex: keyboard echoes to the glass instantly |
 
 ### CTRL status (`get r? term 3`)
 
@@ -67,6 +72,7 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 | 1   | 2     | Input buffer has overflowed     |
 | 2   | 4     | Output is in buffered mode      |
 | 3   | 8     | Input is in buffered mode       |
+| 4   | 16    | Local echo (half duplex) is on  |
 
 ### Control characters (DATA/STRING writes)
 
@@ -102,12 +108,30 @@ teletype.
 - **Enter sends CR (13)** — like a real terminal keyboard. **Backspace sends
   BS (8).** A program that wants line editing must interpret those itself
   (e.g. echo DEL (127) to rub out a character, NEL (133) on Enter).
-- The terminal **never echoes locally** — nothing appears on the glass unless the
-  circuit prints it. An interactive program should echo popped characters back to
-  DATA (see the loop below).
+- By default the terminal is **full duplex** — nothing appears on the glass unless
+  the circuit prints it. An interactive program should echo popped characters back
+  to DATA (see the loop below).
+- **Half duplex** (`put term 3 9`): the keyboard controller echoes keystrokes to
+  the glass the instant they are typed — printables as-is, Enter as a full newline,
+  Backspace as a rubout — without waiting for the circuit. The program must then
+  *not* echo, or every character prints twice. Echo happens even when the FIFO is
+  full, and a rubout can erase past a program-printed prompt (the keyboard doesn't
+  know where your prompt ends — a genuine half-duplex quirk).
 - Non-ASCII characters are replaced with `?`.
 - FIFO capacity is **256 characters**. On overflow, new characters are dropped and
   the overflow flag/`Error` is set (sticky until CTRL 2 or 3).
+
+## Latency and throughput
+
+An IC10 runs 128 lines per tick, 2 ticks per second, so a program-echoed keystroke
+takes up to half a second to appear (plus a network round trip on a multiplayer
+client). Two tools make the terminal feel immediate:
+
+- **Local echo (CTRL 9)** removes the circuit from the echo path entirely — typing
+  paints the glass the same frame. Best for anything interactive.
+- **Buffered input (CTRL 7)** moves up to 6 characters per `get`, so a drain loop
+  spends ~5 instructions per 6 chars instead of per 1 — useful when someone types
+  faster than an unbuffered loop can pop within its 128-line budget.
 
 ## Minimal example
 

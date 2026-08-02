@@ -3,7 +3,7 @@ using Assets.Scripts.Objects.Electrical;
 
 namespace SerialTerminal
 {
-    [XmlInclude(typeof(SerialTerminalSaveData))]
+    // Registered with the save serializer via MOD.AddSaveDataType in Plugin.Awake.
     public class SerialTerminalSaveData : LogicBaseSaveData
     {
         [XmlElement]
@@ -26,5 +26,8 @@ namespace SerialTerminal
 
         [XmlElement]
         public bool InputBuffered;
+
+        [XmlElement]
+        public bool LocalEcho;
     }
 }

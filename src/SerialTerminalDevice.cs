@@ -4,7 +4,6 @@ using System.Text;
 using System.Threading;
 using Assets.Scripts;
 using Assets.Scripts.GridSystem;
-using Assets.Scripts.Inventory;
 using Assets.Scripts.Localization2;
 using Assets.Scripts.Networking;
 using Assets.Scripts.Objects;
@@ -14,7 +13,7 @@ using Assets.Scripts.Objects.Motherboards;
 using Assets.Scripts.Objects.Pipes;
 using Assets.Scripts.UI;
 using Assets.Scripts.Util;
-using HarmonyLib;
+using Rendering;
 using UnityEngine;
 
 namespace SerialTerminal
@@ -42,6 +41,8 @@ namespace SerialTerminal
         private const int CTRL_OUTPUT_BUFFERED = 5;
         private const int CTRL_INPUT_UNBUFFERED = 6;
         private const int CTRL_INPUT_BUFFERED = 7;
+        private const int CTRL_ECHO_OFF = 8;
+        private const int CTRL_ECHO_ON = 9;
 
         // Control characters honoured on output.
         private const char CH_BS = '\b';     // 8: cursor left, stops at column 0
@@ -57,16 +58,16 @@ namespace SerialTerminal
         public const int Rows = 20;
         public const int Columns = 40;
         public const int RxCapacity = 256;
-        private const ushort ScreenNetworkFlag = 512;
 
-        private static readonly AccessTools.FieldRef<LogicDisplay, List<DigitGlyph>> DigitGlyphsRef =
-            AccessTools.FieldRefAccess<LogicDisplay, List<DigitGlyph>>("_digitGlyphs");
+        // Class-specific NetworkUpdateFlags bits. Vanilla puts per-class payloads at
+        // 1024+ (see NetworkUpdateType.Thing.*); below us the chain occupies
+        // 8/16/32/128 (Thing), 64 (Structure) and 256 (LogicUnitBase).
+        private const ushort ScreenNetworkFlag = 1024;  // cells + cursor
+        private const ushort StatusNetworkFlag = 2048;  // rx count + overflow
 
         private readonly object _stateLock = new object();
         private readonly Queue<char> _rx = new Queue<char>();
-        private char[] _cells = new char[0];
-        private int _rows = 1;
-        private int _cols = 1;
+        private readonly char[] _cells = CreateBlankCells();
         private int _cursorRow;
         private int _cursorCol;
         private bool _overflow;
@@ -74,6 +75,12 @@ namespace SerialTerminal
         // buffered = one packed ascii-6 string (up to 6 chars) per get/put.
         private bool _outputBuffered;
         private bool _inputBuffered;
+        // Half-duplex switch: the keyboard controller prints keystrokes directly,
+        // without waiting for the circuit to echo them (instant feel; default off).
+        private bool _localEcho;
+        // Volatile-RAM tracking: the terminal wipes all state when it stops
+        // operating (switched off or power lost), like a real glass TTY.
+        private bool _wasOperating;
         // Input queue count as last synced from the server. _rx itself only lives
         // where the simulation runs; remote clients need this for tooltips/logic reads.
         private int _syncedRxCount;
@@ -88,9 +95,9 @@ namespace SerialTerminal
 
         public int ScreenVersion => _version;
 
-        public int RowCount => _rows;
+        public int RowCount => Rows;
 
-        public int ColumnCount => _cols;
+        public int ColumnCount => Columns;
 
         /// <summary>Input queue length; live where simulating, last synced value on clients.</summary>
         private int DisplayRxCount
@@ -104,20 +111,27 @@ namespace SerialTerminal
             }
         }
 
-        public override void Awake()
+        private static char[] CreateBlankCells()
         {
-            base.Awake();
-            lock (_stateLock)
+            char[] cells = new char[Rows * Columns];
+            for (int i = 0; i < cells.Length; i++) cells[i] = ' ';
+            return cells;
+        }
+
+        /// <summary>
+        /// The vanilla numeric readout draws only for displays inside the digit
+        /// renderer's ActiveDisplays pool; vetoing membership keeps whatever glyphs
+        /// SetDisplay writes invisible, without patching LogicDisplay.
+        /// (SetDisplay still needs a non-null DigitTransform - PrefabFactory
+        /// guarantees one.)
+        /// </summary>
+        public override bool OnAddToPool(object densePool, int slot)
+        {
+            if (ReferenceEquals(densePool, LogicDisplayDigitRenderer.ActiveDisplays))
             {
-                ResizeGrid(Rows, Columns);
+                return false;
             }
-            // Vanilla numeric readout must never draw; SetDisplay is prefix-blocked
-            // for this type, so once cleared the list stays empty.
-            List<DigitGlyph> glyphs = DigitGlyphsRef(this);
-            if (glyphs != null)
-            {
-                glyphs.Clear();
-            }
+            return base.OnAddToPool(densePool, slot);
         }
 
         /// <summary>
@@ -127,14 +141,14 @@ namespace SerialTerminal
         public string[] SnapshotLines(out int cursorRow, out int cursorCol)
         {
             int version = _version;
-            if (_lineCache == null || _lineCacheVersion != version)
+            if (_lineCacheVersion != version)
             {
                 lock (_stateLock)
                 {
-                    string[] lines = new string[_rows];
-                    for (int r = 0; r < _rows; r++)
+                    string[] lines = new string[Rows];
+                    for (int r = 0; r < Rows; r++)
                     {
-                        lines[r] = new string(_cells, r * _cols, _cols);
+                        lines[r] = new string(_cells, r * Columns, Columns);
                     }
                     _lineCache = lines;
                     _cacheCursorRow = _cursorRow;
@@ -145,25 +159,6 @@ namespace SerialTerminal
             cursorRow = _cacheCursorRow;
             cursorCol = _cacheCursorCol;
             return _lineCache;
-        }
-
-        private void ResizeGrid(int rows, int cols)
-        {
-            char[] cells = new char[rows * cols];
-            for (int i = 0; i < cells.Length; i++) cells[i] = ' ';
-            if (_cells.Length > 0)
-            {
-                int copyRows = Mathf.Min(rows, _rows);
-                int copyCols = Mathf.Min(cols, _cols);
-                for (int r = 0; r < copyRows; r++)
-                    for (int c = 0; c < copyCols; c++)
-                        cells[r * cols + c] = _cells[r * _cols + c];
-            }
-            _cells = cells;
-            _rows = rows;
-            _cols = cols;
-            _cursorRow = Mathf.Clamp(_cursorRow, 0, rows - 1);
-            _cursorCol = Mathf.Clamp(_cursorCol, 0, cols - 1);
         }
 
         #region IMemory (IC10 get/put)
@@ -198,7 +193,9 @@ namespace SerialTerminal
                         {
                             result = _rx.Dequeue();
                         }
-                        MarkScreenDirty();
+                        // Popping input never touches the screen cells; only the
+                        // FIFO count changed.
+                        MarkStatusDirty();
                         return result;
                     }
                     case ADDR_STR:
@@ -209,7 +206,8 @@ namespace SerialTerminal
                         return (_rx.Count > 0 ? 1 : 0)
                             | (_overflow ? 2 : 0)
                             | (_outputBuffered ? 4 : 0)
-                            | (_inputBuffered ? 8 : 0);
+                            | (_inputBuffered ? 8 : 0)
+                            | (_localEcho ? 16 : 0);
                     case ADDR_ROW:
                         return _cursorRow;
                     case ADDR_COL:
@@ -222,6 +220,8 @@ namespace SerialTerminal
 
         public void WriteMemory(int address, double value)
         {
+            bool screenChanged = true;
+            bool statusChanged = false;
             lock (_stateLock)
             {
                 switch (address)
@@ -230,7 +230,7 @@ namespace SerialTerminal
                     {
                         if (_outputBuffered)
                         {
-                            PutString(ProgrammableChip.UnpackAscii6(value, signed: true));
+                            PutPacked(value);
                             break;
                         }
                         int code = (int)value;
@@ -238,33 +238,37 @@ namespace SerialTerminal
                         break;
                     }
                     case ADDR_STR:
-                        PutString(ProgrammableChip.UnpackAscii6(value, signed: true));
+                        PutPacked(value);
                         break;
                     case ADDR_COUNT:
                         throw new StackOverflowException();
                     case ADDR_CTRL:
+                        screenChanged = false;
                         switch ((int)value)
                         {
-                            case CTRL_CLEAR_SCREEN: ClearScreen(); break;
-                            case CTRL_FLUSH_INPUT: _rx.Clear(); _overflow = false; break;
-                            case CTRL_CLEAR_OVERFLOW: _overflow = false; break;
+                            case CTRL_CLEAR_SCREEN: ClearScreen(); screenChanged = true; break;
+                            case CTRL_FLUSH_INPUT: _rx.Clear(); _overflow = false; statusChanged = true; break;
+                            case CTRL_CLEAR_OVERFLOW: _overflow = false; statusChanged = true; break;
                             case CTRL_OUTPUT_UNBUFFERED: _outputBuffered = false; break;
                             case CTRL_OUTPUT_BUFFERED: _outputBuffered = true; break;
                             case CTRL_INPUT_UNBUFFERED: _inputBuffered = false; break;
                             case CTRL_INPUT_BUFFERED: _inputBuffered = true; break;
+                            case CTRL_ECHO_OFF: _localEcho = false; break;
+                            case CTRL_ECHO_ON: _localEcho = true; break;
                         }
                         break;
                     case ADDR_ROW:
-                        _cursorRow = Mathf.Clamp((int)value, 0, _rows - 1);
+                        _cursorRow = Mathf.Clamp((int)value, 0, Rows - 1);
                         break;
                     case ADDR_COL:
-                        _cursorCol = Mathf.Clamp((int)value, 0, _cols - 1);
+                        _cursorCol = Mathf.Clamp((int)value, 0, Columns - 1);
                         break;
                     default:
                         throw new StackOverflowException();
                 }
             }
-            MarkScreenDirty();
+            if (screenChanged) MarkScreenDirty();
+            if (statusChanged) MarkStatusDirty();
         }
 
         public void ClearMemory()
@@ -276,13 +280,21 @@ namespace SerialTerminal
                 _overflow = false;
                 _outputBuffered = false;
                 _inputBuffered = false;
+                _localEcho = false;
             }
             MarkScreenDirty();
+            MarkStatusDirty();
         }
 
         #endregion
 
         #region Terminal emulation (callers must hold _stateLock)
+
+        /// <summary>Print one packed ascii-6 double (IC10 STR convention).</summary>
+        private void PutPacked(double value)
+        {
+            PutString(ProgrammableChip.UnpackAscii6(value, signed: true));
+        }
 
         private void PutString(string text)
         {
@@ -311,7 +323,7 @@ namespace SerialTerminal
                     if (_cursorCol > 0)
                     {
                         _cursorCol--;
-                        _cells[_cursorRow * _cols + _cursorCol] = ' ';
+                        _cells[_cursorRow * Columns + _cursorCol] = ' ';
                     }
                     return;
                 case CH_FF:
@@ -319,9 +331,9 @@ namespace SerialTerminal
                     return;
             }
             if (c < ' ') return;
-            _cells[_cursorRow * _cols + _cursorCol] = c;
+            _cells[_cursorRow * Columns + _cursorCol] = c;
             _cursorCol++;
-            if (_cursorCol >= _cols)
+            if (_cursorCol >= Columns)
             {
                 _cursorCol = 0;
                 LineFeed();
@@ -332,10 +344,10 @@ namespace SerialTerminal
         private void LineFeed()
         {
             _cursorRow++;
-            if (_cursorRow < _rows) return;
-            _cursorRow = _rows - 1;
-            Array.Copy(_cells, _cols, _cells, 0, (_rows - 1) * _cols);
-            for (int c = 0; c < _cols; c++) _cells[(_rows - 1) * _cols + c] = ' ';
+            if (_cursorRow < Rows) return;
+            _cursorRow = Rows - 1;
+            Array.Copy(_cells, Columns, _cells, 0, (Rows - 1) * Columns);
+            for (int c = 0; c < Columns; c++) _cells[(Rows - 1) * Columns + c] = ' ';
         }
 
         private void ClearScreen()
@@ -346,6 +358,32 @@ namespace SerialTerminal
         }
 
         #endregion
+
+        /// <summary>
+        /// No NVRAM: losing power or being switched off wipes the whole terminal
+        /// (screen, FIFO, flags, modes) — a power cycle is a full reset.
+        /// </summary>
+        public override void OnInteractableUpdated(Interactable interactable)
+        {
+            base.OnInteractableUpdated(interactable);
+            if (interactable.Action != InteractableType.OnOff
+                && interactable.Action != InteractableType.Powered)
+            {
+                return;
+            }
+            // Interactable states flap while a world loads (power network warm-up);
+            // that is not a power cycle. _wasOperating is restored by DeserializeSave.
+            if (GameManager.GameState != GameState.Running)
+            {
+                return;
+            }
+            bool operating = OnOff && Powered;
+            if (_wasOperating && !operating && GameManager.RunSimulation)
+            {
+                ClearMemory();
+            }
+            _wasOperating = operating;
+        }
 
         #region Player input
 
@@ -366,7 +404,8 @@ namespace SerialTerminal
                 {
                     return action.Succeed();
                 }
-                if (!GameManager.IsBatchMode && IsLocalPlayerInteraction(interaction))
+                if (!GameManager.IsBatchMode
+                    && interaction.SourceThing is Entity entity && entity.IsLocalPlayer)
                 {
                     TerminalWindow.Open(this);
                 }
@@ -382,15 +421,6 @@ namespace SerialTerminal
                 return "Open Terminal";
             }
             return base.GetContextualName(interactable);
-        }
-
-        private static bool IsLocalPlayerInteraction(Interaction interaction)
-        {
-            Human local = InventoryManager.ParentHuman;
-            if (local == null || local.OrganBrain == null) return false;
-            Entity source = interaction.SourceThing as Entity;
-            return source != null && source.OrganBrain != null
-                && source.OrganBrain.ClientId == local.OrganBrain.ClientId;
         }
 
         /// <summary>Local player pressed keys in the terminal window (raw, unbuffered).</summary>
@@ -414,20 +444,42 @@ namespace SerialTerminal
         /// <summary>Server side: queue raw keystrokes into the input FIFO, as-is.</summary>
         public void EnqueueInput(string text)
         {
+            bool echoed;
             lock (_stateLock)
             {
+                echoed = _localEcho;
                 foreach (char raw in text)
                 {
-                    char c = raw > '\u007f' ? '?' : raw;
+                    char c = raw > CH_DEL ? '?' : raw;
+                    // Half-duplex: the keyboard controller prints directly, even
+                    // when the FIFO is full - the glass is wired to the keyboard.
+                    if (echoed) EchoChar(c);
                     if (_rx.Count >= RxCapacity)
                     {
                         _overflow = true;
-                        break;
+                        continue;
                     }
                     _rx.Enqueue(c);
                 }
             }
-            MarkScreenDirty();
+            if (echoed) MarkScreenDirty();
+            MarkStatusDirty();
+        }
+
+        /// <summary>
+        /// Local-echo rendering of one keystroke (caller must hold _stateLock):
+        /// Enter (CR) echoes as a full newline, Backspace (BS) as a rubout.
+        /// </summary>
+        private void EchoChar(char c)
+        {
+            switch (c)
+            {
+                case CH_CR: PutChar(CH_NEL); return;
+                case CH_BS: PutChar(CH_DEL); return;
+                default:
+                    if (c >= ' ') PutChar(c);
+                    return;
+            }
         }
 
         #endregion
@@ -463,7 +515,7 @@ namespace SerialTerminal
             {
                 lock (_stateLock)
                 {
-                    PutString(ProgrammableChip.UnpackAscii6(value, signed: true));
+                    PutPacked(value);
                 }
                 MarkScreenDirty();
             }
@@ -471,21 +523,7 @@ namespace SerialTerminal
 
         #endregion
 
-        #region Rendering
-
-        // Every vanilla repaint path (power/mode/color changes, registration, setting
-        // changes) funnels through LogicDisplay.SetDisplay, which is not virtual - a
-        // Harmony prefix in Patches.cs redirects those calls here. The vanilla body
-        // must never run: it would fill the digit glyph list with the numeric readout.
-        internal void RenderTerminalNow()
-        {
-            List<DigitGlyph> glyphs = DigitGlyphsRef(this);
-            if (glyphs != null)
-            {
-                glyphs.Clear();
-            }
-            Interlocked.Increment(ref _version);
-        }
+        #region Dirty flags
 
         private void MarkScreenDirty()
         {
@@ -494,6 +532,15 @@ namespace SerialTerminal
                 NetworkUpdateFlags |= ScreenNetworkFlag;
             }
             Interlocked.Increment(ref _version);
+        }
+
+        /// <summary>FIFO count / overflow changed but the screen did not.</summary>
+        private void MarkStatusDirty()
+        {
+            if (NetworkManager.IsServer)
+            {
+                NetworkUpdateFlags |= StatusNetworkFlag;
+            }
         }
 
         #endregion
@@ -507,6 +554,10 @@ namespace SerialTerminal
             {
                 WriteScreenState(writer);
             }
+            if (Thing.IsNetworkUpdateRequired(StatusNetworkFlag, networkUpdateType))
+            {
+                WriteStatusState(writer);
+            }
         }
 
         public override void ProcessUpdate(RocketBinaryReader reader, ushort networkUpdateType)
@@ -516,18 +567,24 @@ namespace SerialTerminal
             {
                 ReadScreenState(reader);
             }
+            if (Thing.IsNetworkUpdateRequired(StatusNetworkFlag, networkUpdateType))
+            {
+                ReadStatusState(reader);
+            }
         }
 
         public override void SerializeOnJoin(RocketBinaryWriter writer)
         {
             base.SerializeOnJoin(writer);
             WriteScreenState(writer);
+            WriteStatusState(writer);
         }
 
         public override void DeserializeOnJoin(RocketBinaryReader reader)
         {
             base.DeserializeOnJoin(reader);
             ReadScreenState(reader);
+            ReadStatusState(reader);
         }
 
         private void WriteScreenState(RocketBinaryWriter writer)
@@ -537,8 +594,6 @@ namespace SerialTerminal
                 writer.WriteString(ScreenToString());
                 writer.WriteByte((byte)_cursorRow);
                 writer.WriteByte((byte)_cursorCol);
-                writer.WriteBoolean(_overflow);
-                writer.WriteUInt16((ushort)_rx.Count);
             }
         }
 
@@ -547,17 +602,33 @@ namespace SerialTerminal
             string text = reader.ReadString();
             byte row = reader.ReadByte();
             byte col = reader.ReadByte();
+            lock (_stateLock)
+            {
+                ScreenFromString(text);
+                _cursorRow = Mathf.Clamp(row, 0, Rows - 1);
+                _cursorCol = Mathf.Clamp(col, 0, Columns - 1);
+            }
+            Interlocked.Increment(ref _version);
+        }
+
+        private void WriteStatusState(RocketBinaryWriter writer)
+        {
+            lock (_stateLock)
+            {
+                writer.WriteBoolean(_overflow);
+                writer.WriteUInt16((ushort)_rx.Count);
+            }
+        }
+
+        private void ReadStatusState(RocketBinaryReader reader)
+        {
             bool overflow = reader.ReadBoolean();
             ushort rxCount = reader.ReadUInt16();
             lock (_stateLock)
             {
-                ScreenFromString(text);
-                _cursorRow = Mathf.Clamp(row, 0, _rows - 1);
-                _cursorCol = Mathf.Clamp(col, 0, _cols - 1);
                 _overflow = overflow;
                 _syncedRxCount = rxCount;
             }
-            Interlocked.Increment(ref _version);
         }
 
         #endregion
@@ -585,6 +656,7 @@ namespace SerialTerminal
                     data.Overflow = _overflow;
                     data.OutputBuffered = _outputBuffered;
                     data.InputBuffered = _inputBuffered;
+                    data.LocalEcho = _localEcho;
                 }
             }
         }
@@ -597,11 +669,12 @@ namespace SerialTerminal
                 lock (_stateLock)
                 {
                     ScreenFromString(data.ScreenText);
-                    _cursorRow = Mathf.Clamp(data.CursorRow, 0, _rows - 1);
-                    _cursorCol = Mathf.Clamp(data.CursorCol, 0, _cols - 1);
+                    _cursorRow = Mathf.Clamp(data.CursorRow, 0, Rows - 1);
+                    _cursorCol = Mathf.Clamp(data.CursorCol, 0, Columns - 1);
                     _overflow = data.Overflow;
                     _outputBuffered = data.OutputBuffered;
                     _inputBuffered = data.InputBuffered;
+                    _localEcho = data.LocalEcho;
                     _rx.Clear();
                     if (!string.IsNullOrEmpty(data.InputBuffer))
                     {
@@ -611,6 +684,9 @@ namespace SerialTerminal
                         }
                     }
                 }
+                // Interactable states (OnOff/Powered) are restored by the base
+                // deserialize, so this reflects the state at save time.
+                _wasOperating = OnOff && Powered;
                 Interlocked.Increment(ref _version);
             }
         }
@@ -667,13 +743,13 @@ namespace SerialTerminal
 
         private string ScreenToString()
         {
-            StringBuilder sb = new StringBuilder(_cells.Length + _rows);
-            for (int r = 0; r < _rows; r++)
+            StringBuilder sb = new StringBuilder(_cells.Length + Rows);
+            for (int r = 0; r < Rows; r++)
             {
-                int end = _cols;
-                while (end > 0 && _cells[r * _cols + end - 1] == ' ') end--;
-                sb.Append(_cells, r * _cols, end);
-                if (r < _rows - 1) sb.Append('\n');
+                int end = Columns;
+                while (end > 0 && _cells[r * Columns + end - 1] == ' ') end--;
+                sb.Append(_cells, r * Columns, end);
+                if (r < Rows - 1) sb.Append('\n');
             }
             return sb.ToString();
         }
@@ -683,12 +759,12 @@ namespace SerialTerminal
             ClearScreen();
             if (string.IsNullOrEmpty(text)) return;
             string[] lines = text.Split('\n');
-            for (int r = 0; r < _rows && r < lines.Length; r++)
+            for (int r = 0; r < Rows && r < lines.Length; r++)
             {
                 string line = lines[r];
-                for (int c = 0; c < _cols && c < line.Length; c++)
+                for (int c = 0; c < Columns && c < line.Length; c++)
                 {
-                    _cells[r * _cols + c] = line[c];
+                    _cells[r * Columns + c] = line[c];
                 }
             }
         }
@@ -698,13 +774,17 @@ namespace SerialTerminal
         public override StringBuilder GetExtendedText()
         {
             StringBuilder sb = base.GetExtendedText();
-            sb.Append("Input Buffer ").AppendLine((DisplayRxCount + "/" + RxCapacity).AsColor("yellow"));
+            int rxCount;
+            bool overflow;
             lock (_stateLock)
             {
-                if (_overflow)
-                {
-                    sb.AppendLine("Input Overflow".AsColor("red"));
-                }
+                rxCount = GameManager.RunSimulation ? _rx.Count : _syncedRxCount;
+                overflow = _overflow;
+            }
+            sb.Append("Input Buffer ").AppendLine((rxCount + "/" + RxCapacity).AsColor("yellow"));
+            if (overflow)
+            {
+                sb.AppendLine("Input Overflow".AsColor("red"));
             }
             return sb;
         }
