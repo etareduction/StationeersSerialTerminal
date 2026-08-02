@@ -24,7 +24,7 @@ namespace SerialTerminal
         public const string KitPrefabName = "ItemKitSerialTerminal";
         public const string SourceKitName = "ItemKitComputer";
 
-        // The config value is tried first. StructureComputer = "Computer (Modern)".
+        // Tried in order. StructureComputer = "Computer (Modern)".
         private static readonly string[] SourcePrefabFallbacks =
         {
             "StructureComputer",
@@ -104,17 +104,6 @@ namespace SerialTerminal
 
         private static Structure FindSourceStructure()
         {
-            string configured = SerialTerminalPlugin.SourcePrefab.Value;
-            if (!string.IsNullOrEmpty(configured))
-            {
-                Structure structure = FindPrefab<Structure>(configured);
-                if (structure != null)
-                {
-                    return structure;
-                }
-                SerialTerminalPlugin.Log.LogWarning(
-                    $"Configured SourcePrefab '{configured}' not found; trying fallbacks");
-            }
             foreach (string name in SourcePrefabFallbacks)
             {
                 Structure structure = FindPrefab<Structure>(name);

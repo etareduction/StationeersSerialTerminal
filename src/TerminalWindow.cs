@@ -16,6 +16,8 @@ namespace SerialTerminal
     public static class TerminalWindow
     {
         private const string InputStateKey = "SerialTerminalWindow";
+        // Window auto-closes when the player walks this far from the terminal (meters).
+        private const float CloseDistance = 8f;
 
         private static readonly ImGuiModal Modal = new ImGuiModal();
         private static SerialTerminalDevice _device;
@@ -151,9 +153,8 @@ namespace SerialTerminal
             {
                 return false;
             }
-            float maxDistance = Mathf.Max(2f, SerialTerminalPlugin.CloseDistance.Value);
             return (device.transform.position - human.transform.position).sqrMagnitude
-                > maxDistance * maxDistance;
+                > CloseDistance * CloseDistance;
         }
     }
 }

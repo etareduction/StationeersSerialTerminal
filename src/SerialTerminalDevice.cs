@@ -37,6 +37,8 @@ namespace SerialTerminal
         private const int CTRL_FLUSH_INPUT = 2;
         private const int CTRL_CLEAR_OVERFLOW = 3;
 
+        public const int Rows = 20;
+        public const int Columns = 40;
         public const int RxCapacity = 256;
         private const ushort ScreenNetworkFlag = 512;
 
@@ -51,6 +53,9 @@ namespace SerialTerminal
         private int _cursorRow;
         private int _cursorCol;
         private bool _overflow;
+        // Input queue count as last synced from the server. _rx itself only lives
+        // where the simulation runs; remote clients need this for tooltips/logic reads.
+        private int _syncedRxCount;
 
         // Incremented on every visible state change; the ImGui window and the
         // in-world screen renderer poll it to know when to repaint.
@@ -66,14 +71,24 @@ namespace SerialTerminal
 
         public int ColumnCount => _cols;
 
+        /// <summary>Input queue length; live where simulating, last synced value on clients.</summary>
+        private int DisplayRxCount
+        {
+            get
+            {
+                lock (_stateLock)
+                {
+                    return GameManager.RunSimulation ? _rx.Count : _syncedRxCount;
+                }
+            }
+        }
+
         public override void Awake()
         {
             base.Awake();
-            int rows = Mathf.Clamp(SerialTerminalPlugin.Rows.Value, 4, 64);
-            int cols = Mathf.Clamp(SerialTerminalPlugin.Columns.Value, 8, 128);
             lock (_stateLock)
             {
-                ResizeGrid(rows, cols);
+                ResizeGrid(Rows, Columns);
             }
             // Vanilla numeric readout must never draw; SetDisplay is prefix-blocked
             // for this type, so once cleared the list stays empty.
@@ -360,7 +375,7 @@ namespace SerialTerminal
             switch (logicType)
             {
                 case LogicType.Quantity:
-                    lock (_stateLock) return _rx.Count;
+                    return DisplayRxCount;
                 case LogicType.Error:
                     lock (_stateLock) return _overflow ? 1 : 0;
                 default:
@@ -450,6 +465,7 @@ namespace SerialTerminal
                 writer.WriteByte((byte)_cursorRow);
                 writer.WriteByte((byte)_cursorCol);
                 writer.WriteBoolean(_overflow);
+                writer.WriteUInt16((ushort)_rx.Count);
             }
         }
 
@@ -459,12 +475,14 @@ namespace SerialTerminal
             byte row = reader.ReadByte();
             byte col = reader.ReadByte();
             bool overflow = reader.ReadBoolean();
+            ushort rxCount = reader.ReadUInt16();
             lock (_stateLock)
             {
                 ScreenFromString(text);
                 _cursorRow = Mathf.Clamp(row, 0, _rows - 1);
                 _cursorCol = Mathf.Clamp(col, 0, _cols - 1);
                 _overflow = overflow;
+                _syncedRxCount = rxCount;
             }
             Interlocked.Increment(ref _version);
         }
@@ -557,9 +575,9 @@ namespace SerialTerminal
         public override StringBuilder GetExtendedText()
         {
             StringBuilder sb = base.GetExtendedText();
+            sb.Append("Input Buffer ").AppendLine((DisplayRxCount + "/" + RxCapacity).AsColor("yellow"));
             lock (_stateLock)
             {
-                sb.Append("Input Buffer ").AppendLine((_rx.Count + "/" + RxCapacity).AsColor("yellow"));
                 if (_overflow)
                 {
                     sb.AppendLine("Input Overflow".AsColor("red"));

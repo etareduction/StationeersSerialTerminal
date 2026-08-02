@@ -19,30 +19,13 @@ namespace SerialTerminal
         public static readonly uint WindowBackground = Color32ToImGui(new Color32(16, 16, 16, 255));
         public static readonly uint ScreenBackground = Color32ToImGui(new Color32(2, 8, 2, 255));
 
-        private static uint _textColor;
-        private static string _parsedTextColor;
-
-        public static uint TextColor
-        {
-            get
-            {
-                string configured = SerialTerminalPlugin.TextColor.Value;
-                if (_parsedTextColor != configured)
-                {
-                    _textColor = ParseHtmlColor(configured, new Color32(51, 255, 51, 255));
-                    _parsedTextColor = configured;
-                }
-                return _textColor;
-            }
-        }
-
-        public static uint CursorColor => (TextColor & 0x00FFFFFFu) | 0xA0000000u;
+        // Phosphor green (#33FF33) with a translucent block cursor.
+        public static readonly uint TextColor = Color32ToImGui(new Color32(51, 255, 51, 255));
+        public static readonly uint CursorColor = (TextColor & 0x00FFFFFFu) | 0xA0000000u;
 
         public static ImFontPtr PickFont(ImGuiIOPtr io)
         {
-            int count = io.Fonts.Fonts.Size;
-            int index = Mathf.Clamp(SerialTerminalPlugin.FontIndex.Value, 0, count - 1);
-            return io.Fonts.Fonts[index];
+            return io.Fonts.Fonts[0];
         }
 
         /// <summary>
@@ -68,16 +51,6 @@ namespace SerialTerminal
 
             Vector2 cursorMin = new Vector2(origin.x + cursorCol * charW, origin.y + cursorRow * lineH);
             drawList.AddRectFilled(cursorMin, cursorMin + new Vector2(charW, lineH), CursorColor);
-        }
-
-        public static uint ParseHtmlColor(string html, Color32 fallback)
-        {
-            Color32 c = fallback;
-            if (!string.IsNullOrEmpty(html) && ColorUtility.TryParseHtmlString(html.Trim(), out Color parsed))
-            {
-                c = parsed;
-            }
-            return Color32ToImGui(c);
         }
 
         private static uint Color32ToImGui(Color32 c)
@@ -310,16 +283,11 @@ namespace SerialTerminal
                 return false;
             }
 
-            // Screen size: explicit config override, else the size captured from the
-            // source prefab's monitor canvas, else the LogicDisplay panel width.
+            // Screen size: the size captured from the source prefab's monitor canvas,
+            // else the LogicDisplay panel width (square).
             float width;
             float height;
-            if (SerialTerminalPlugin.ScreenWidth.Value > 0f)
-            {
-                width = SerialTerminalPlugin.ScreenWidth.Value;
-                height = width * Mathf.Max(0.1f, SerialTerminalPlugin.ScreenAspect.Value);
-            }
-            else if (ScreenWorldWidth > 0f && ScreenWorldHeight > 0f)
+            if (ScreenWorldWidth > 0f && ScreenWorldHeight > 0f)
             {
                 width = ScreenWorldWidth;
                 height = ScreenWorldHeight;
@@ -327,11 +295,11 @@ namespace SerialTerminal
             else
             {
                 width = Mathf.Max(0.1f, _device.MaxPixelWidth);
-                height = width * Mathf.Max(0.1f, SerialTerminalPlugin.ScreenAspect.Value);
+                height = width;
             }
 
             // Texture matches the screen's aspect so glyphs aren't stretched.
-            int texWidth = Mathf.Clamp(SerialTerminalPlugin.ScreenTextureSize.Value, 128, 2048);
+            const int texWidth = 512;
             int texHeight = Mathf.Clamp(Mathf.RoundToInt(texWidth * height / width), 128, 2048);
             _texture = new RenderTexture(texWidth, texHeight, 0, RenderTextureFormat.ARGB32,
                 RenderTextureReadWrite.sRGB)
@@ -363,8 +331,8 @@ namespace SerialTerminal
             GameObject quad = new GameObject("SerialTerminalScreenQuad");
             quad.layer = anchor.gameObject.layer;
             quad.transform.SetParent(_device.transform, worldPositionStays: false);
-            quad.transform.position = anchor.position
-                + anchor.forward * SerialTerminalPlugin.ScreenZOffset.Value;
+            // Nudged off the panel face so the quad doesn't z-fight with the monitor mesh.
+            quad.transform.position = anchor.position + anchor.forward * 0.002f;
             quad.transform.rotation = anchor.rotation;
             quad.transform.localScale = new Vector3(width, height, 1f);
             _quadMesh = BuildDoubleSidedQuad();

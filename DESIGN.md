@@ -54,7 +54,7 @@ mirroring the in-world screen plus an input line at the bottom. Enter → line +
 into the input FIFO. On a client, the line travels to the server via a LaunchPadBooster
 `INetworkMessage` (`TerminalInputMessage { referenceId, text }`); guarded by the standard
 "is local player" check used by `LogicHashGen`. Esc / close button / walking away
-(config `UI.CloseDistance`) closes the window. Input capture uses the same pattern as
+(8 m) closes the window. Input capture uses the same pattern as
 the game's own creative spawn menu: `KeyManager.SetInputState(..., Typing)` +
 `MouseModeController.AddModal(ImGuiModal)`.
 
@@ -95,7 +95,7 @@ FPGA mod conventions):
    (`LogicDisplayDigitRenderer` draws `DigitGlyphs`; offsets are full Vector3 → multi-row
    layout; `DigitTransform.localScale` shrinks glyphs). Override `SetDisplay` so every
    vanilla repaint path renders the terminal grid instead of the numeric readout.
-   Grid ~24×6 (tunable via BepInEx config until visuals verified in-game).
+   Grid is fixed at 20×40 (constants in `SerialTerminalDevice`; no config).
    Chars without a glyph mesh fall back to uppercase, then '?'.
 3. Sync/persistence:
    - Server→client: screen text + flags on a spare `NetworkUpdateFlags` bit (512) in
