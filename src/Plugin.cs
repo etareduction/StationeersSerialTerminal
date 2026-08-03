@@ -16,7 +16,7 @@ namespace SerialTerminal
         public const string NAME = "SerialTerminal";
         public const string VERSION = "0.4.3";
 
-        public static readonly Mod MOD = new Mod(NAME, VERSION);
+        public static readonly Mod MOD = new(NAME, VERSION);
 
         internal static ManualLogSource Log;
         private static bool _initialized;

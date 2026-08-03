@@ -66,8 +66,8 @@ namespace SerialTerminal
         private const ushort ScreenNetworkFlag = 1024;  // cells + cursor
         private const ushort StatusNetworkFlag = 2048;  // rx count + overflow
 
-        private readonly object _stateLock = new object();
-        private readonly Queue<char> _rx = new Queue<char>();
+        private readonly object _stateLock = new();
+        private readonly Queue<char> _rx = new();
         private readonly char[] _cells = CreateBlankCells();
         private int _cursorRow;
         private int _cursorCol;
@@ -396,7 +396,7 @@ namespace SerialTerminal
         {
             if (interactable.Action == InteractableType.Activate)
             {
-                DelayedActionInstance action = new DelayedActionInstance
+                DelayedActionInstance action = new()
                 {
                     Duration = 0f,
                     ActionMessage = interactable.ContextualName
@@ -712,7 +712,7 @@ namespace SerialTerminal
         // used \n for newlines; UnescapeBuffer still accepts that.
         private static string EscapeBuffer(string text)
         {
-            StringBuilder sb = new StringBuilder(text.Length);
+            StringBuilder sb = new(text.Length);
             foreach (char c in text)
             {
                 if (c == '\\') sb.Append("\\\\");
@@ -724,7 +724,7 @@ namespace SerialTerminal
 
         private static string UnescapeBuffer(string text)
         {
-            StringBuilder sb = new StringBuilder(text.Length);
+            StringBuilder sb = new(text.Length);
             for (int i = 0; i < text.Length; i++)
             {
                 char c = text[i];
@@ -757,7 +757,7 @@ namespace SerialTerminal
 
         private string ScreenToString()
         {
-            StringBuilder sb = new StringBuilder(_cells.Length + Rows);
+            StringBuilder sb = new(_cells.Length + Rows);
             for (int r = 0; r < Rows; r++)
             {
                 int end = Columns;

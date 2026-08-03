@@ -51,7 +51,7 @@ namespace SerialTerminal
             ImGui.PopStyleColor();
             ImGui.PopStyleVar();
 
-            Vector2 cursorMin = new Vector2(origin.x + cursorCol * charW, origin.y + cursorRow * lineH);
+            Vector2 cursorMin = new(origin.x + cursorCol * charW, origin.y + cursorRow * lineH);
             drawList.AddRectFilled(cursorMin, cursorMin + new Vector2(charW, lineH), CursorColor);
         }
 
@@ -313,6 +313,8 @@ namespace SerialTerminal
 
         [SuppressMessage("Maintainability", "CA1508:Avoid dead conditional code",
             Justification = "False positive: CreateRenderer returns null when the game's shader resources are missing")]
+        [SuppressMessage("Style", "IDE0029:Null check can be simplified",
+            Justification = "?? on UnityEngine.Object bypasses the lifetime-aware == operator; a destroyed anchor must fall through to the fallbacks")]
         private bool EnsureSetup()
         {
             if (_quadRenderer != null)
@@ -376,8 +378,10 @@ namespace SerialTerminal
             // Double-sided mesh: canvas/quad facing conventions differ per prefab, and
             // a wrong guess means an invisible (backface-culled) screen. The back side
             // mirrors UVs so the text reads correctly from whichever side is visible.
-            GameObject quad = new GameObject("SerialTerminalScreenQuad");
-            quad.layer = anchor.gameObject.layer;
+            GameObject quad = new("SerialTerminalScreenQuad")
+            {
+                layer = anchor.gameObject.layer
+            };
             quad.transform.SetParent(_device.transform, worldPositionStays: false);
             // Nudged off the panel face so the quad doesn't z-fight with the monitor mesh.
             quad.transform.SetPositionAndRotation(anchor.position + anchor.forward * 0.002f, anchor.rotation);
@@ -400,8 +404,10 @@ namespace SerialTerminal
 
         private static Mesh BuildDoubleSidedQuad()
         {
-            var mesh = new Mesh { name = "SerialTerminalScreenMesh" };
-            mesh.vertices = new[]
+            var mesh = new Mesh
+            {
+                name = "SerialTerminalScreenMesh",
+                vertices = new[]
             {
                 // front (visible from -Z, like Unity's Quad primitive)
                 new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
@@ -409,21 +415,22 @@ namespace SerialTerminal
                 // back (visible from +Z)
                 new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
                 new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f)
-            };
-            mesh.uv = new[]
+            },
+                uv = new[]
             {
                 new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f)
-            };
-            mesh.normals = new[]
+            },
+                normals = new[]
             {
                 -Vector3.forward, -Vector3.forward, -Vector3.forward, -Vector3.forward,
                 Vector3.forward, Vector3.forward, Vector3.forward, Vector3.forward
-            };
-            mesh.triangles = new[]
+            },
+                triangles = new[]
             {
                 0, 2, 1, 1, 2, 3,
                 4, 5, 6, 6, 5, 7
+            }
             };
             mesh.RecalculateBounds();
             return mesh;

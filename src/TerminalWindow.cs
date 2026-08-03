@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Assets.Scripts;
 using Assets.Scripts.GridSystem;
 using Assets.Scripts.Inventory;
@@ -24,7 +25,7 @@ namespace SerialTerminal
 
         // MouseModeController.Check re-locks the cursor every frame unless a modal
         // is registered; the window manager only handles mouse-as-pointer mode.
-        private static readonly ImGuiModal Modal = new ImGuiModal();
+        private static readonly ImGuiModal Modal = new();
         private static TerminalWindow _current;
 
         private readonly SerialTerminalDevice _device;
@@ -59,6 +60,8 @@ namespace SerialTerminal
             InventoryManager.EnablePlayerKeys = false;
         }
 
+        [SuppressMessage("Style", "IDE0031:Null check can be simplified",
+            Justification = "?. on UnityEngine.Object bypasses the lifetime-aware == operator and could call into a destroyed manager")]
         public override void OnClose()
         {
             _current = null;
@@ -90,7 +93,7 @@ namespace SerialTerminal
 
             float charW = ImGui.CalcTextSize("M").x;
             float lineH = ImGui.GetTextLineHeight();
-            Vector2 screenSize = new Vector2(
+            Vector2 screenSize = new(
                 SerialTerminalDevice.Columns * charW + 16f,
                 SerialTerminalDevice.Rows * lineH + 16f);
 
@@ -98,7 +101,7 @@ namespace SerialTerminal
             {
                 _justOpened = false;
                 Vector2 framePad = ImGui.GetStyle().FramePadding;
-                Vector2 windowSize = new Vector2(
+                Vector2 windowSize = new(
                     screenSize.x + 24f,
                     screenSize.y + lineH + framePad.y * 2f + 64f);
                 ImGui.SetWindowSize(windowSize);

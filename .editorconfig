@@ -57,28 +57,28 @@ dotnet_style_parentheses_in_relational_binary_operators = always_for_clarity:sil
 dotnet_style_require_accessibility_modifiers = for_non_interface_members:silent
 
 # Expression-level preferences
-dotnet_style_coalesce_expression = true:suggestion
-dotnet_style_collection_initializer = true:suggestion
-dotnet_style_explicit_tuple_names = true:suggestion
+dotnet_style_coalesce_expression = true:warning
+dotnet_style_collection_initializer = true:warning
+dotnet_style_explicit_tuple_names = true:warning
 dotnet_style_namespace_match_folder = false
-dotnet_style_null_propagation = true:suggestion
-dotnet_style_object_initializer = true:suggestion
+dotnet_style_null_propagation = true:warning
+dotnet_style_object_initializer = true:warning
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
-dotnet_style_prefer_auto_properties = true:suggestion
-dotnet_style_prefer_compound_assignment = true:suggestion
+dotnet_style_prefer_auto_properties = true:warning
+dotnet_style_prefer_compound_assignment = true:warning
 dotnet_style_prefer_conditional_expression_over_assignment = true:silent
 dotnet_style_prefer_conditional_expression_over_return = true:silent
-dotnet_style_prefer_inferred_anonymous_type_member_names = true:suggestion
-dotnet_style_prefer_inferred_tuple_names = true:suggestion
-dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
-dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
-dotnet_style_prefer_simplified_interpolation = true:suggestion
+dotnet_style_prefer_inferred_anonymous_type_member_names = true:warning
+dotnet_style_prefer_inferred_tuple_names = true:warning
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+dotnet_style_prefer_simplified_boolean_expressions = true:warning
+dotnet_style_prefer_simplified_interpolation = true:warning
 
 # Field preferences
 dotnet_style_readonly_field = true:warning
 
 # Parameter preferences
-dotnet_code_quality_unused_parameters = all:suggestion
+dotnet_code_quality_unused_parameters = all:warning
 
 # Suppression preferences
 dotnet_remove_unnecessary_suppression_exclusions = none
@@ -95,41 +95,41 @@ csharp_style_var_when_type_is_apparent = false:silent
 csharp_style_expression_bodied_accessors = true:silent
 csharp_style_expression_bodied_constructors = false:silent
 csharp_style_expression_bodied_indexers = true:silent
-csharp_style_expression_bodied_lambdas = true:suggestion
+csharp_style_expression_bodied_lambdas = true:warning
 csharp_style_expression_bodied_local_functions = false:silent
 csharp_style_expression_bodied_methods = false:silent
 csharp_style_expression_bodied_operators = false:silent
 csharp_style_expression_bodied_properties = true:silent
 
 # Pattern matching preferences
-csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
-csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
-csharp_style_prefer_not_pattern = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:warning
+csharp_style_pattern_matching_over_is_with_cast_check = true:warning
+csharp_style_prefer_not_pattern = true:warning
 csharp_style_prefer_pattern_matching = true:silent
-csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_prefer_switch_expression = true:warning
 
 # Null-checking preferences
-csharp_style_conditional_delegate_call = true:suggestion
+csharp_style_conditional_delegate_call = true:warning
 
 # Modifier preferences
 csharp_prefer_static_local_function = true:warning
-csharp_preferred_modifier_order = public,private,protected,internal,const,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:suggestion
+csharp_preferred_modifier_order = public,private,protected,internal,const,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:warning
 
 # Code-block preferences
 csharp_prefer_braces = true:silent
-csharp_prefer_simple_using_statement = true:suggestion
+csharp_prefer_simple_using_statement = true:warning
 # C# 9 project: file-scoped namespaces are a C# 10 feature.
-csharp_style_namespace_declarations = block_scoped:suggestion
+csharp_style_namespace_declarations = block_scoped:warning
 csharp_style_prefer_method_group_conversion = true:silent
 
 # Expression-level preferences
-csharp_prefer_simple_default_expression = true:suggestion
-csharp_style_deconstructed_variable_declaration = true:suggestion
-csharp_style_inlined_variable_declaration = true:suggestion
-csharp_style_prefer_local_over_anonymous_function = true:suggestion
-csharp_style_prefer_null_check_over_type_check = true:suggestion
-csharp_style_throw_expression = true:suggestion
-csharp_style_unused_value_assignment_preference = discard_variable:suggestion
+csharp_prefer_simple_default_expression = true:warning
+csharp_style_deconstructed_variable_declaration = true:warning
+csharp_style_inlined_variable_declaration = true:warning
+csharp_style_prefer_local_over_anonymous_function = true:warning
+csharp_style_prefer_null_check_over_type_check = true:warning
+csharp_style_throw_expression = true:warning
+csharp_style_unused_value_assignment_preference = discard_variable:warning
 csharp_style_unused_value_expression_statement_preference = discard_variable:silent
 
 # 'using' directive preferences
@@ -190,49 +190,57 @@ csharp_preserve_single_line_statements = true
 
 # Naming rules
 
-dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.severity = warning
 dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.symbols = types_and_namespaces
 dotnet_naming_rule.types_and_namespaces_should_be_pascalcase.style = pascalcase
 
-dotnet_naming_rule.interfaces_should_be_ipascalcase.severity = suggestion
+dotnet_naming_rule.interfaces_should_be_ipascalcase.severity = warning
 dotnet_naming_rule.interfaces_should_be_ipascalcase.symbols = interfaces
 dotnet_naming_rule.interfaces_should_be_ipascalcase.style = ipascalcase
 
-dotnet_naming_rule.methods_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.methods_should_be_pascalcase.severity = warning
 dotnet_naming_rule.methods_should_be_pascalcase.symbols = methods
 dotnet_naming_rule.methods_should_be_pascalcase.style = pascalcase
 
-dotnet_naming_rule.properties_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.properties_should_be_pascalcase.severity = warning
 dotnet_naming_rule.properties_should_be_pascalcase.symbols = properties
 dotnet_naming_rule.properties_should_be_pascalcase.style = pascalcase
 
-dotnet_naming_rule.events_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.events_should_be_pascalcase.severity = warning
 dotnet_naming_rule.events_should_be_pascalcase.symbols = events
 dotnet_naming_rule.events_should_be_pascalcase.style = pascalcase
 
-dotnet_naming_rule.local_variables_should_be_camelcase.severity = suggestion
+dotnet_naming_rule.local_variables_should_be_camelcase.severity = warning
 dotnet_naming_rule.local_variables_should_be_camelcase.symbols = local_variables
 dotnet_naming_rule.local_variables_should_be_camelcase.style = camelcase
 
-dotnet_naming_rule.parameters_should_be_camelcase.severity = suggestion
+dotnet_naming_rule.parameters_should_be_camelcase.severity = warning
 dotnet_naming_rule.parameters_should_be_camelcase.symbols = parameters
 dotnet_naming_rule.parameters_should_be_camelcase.style = camelcase
 
-dotnet_naming_rule.public_fields_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.public_fields_should_be_pascalcase.severity = warning
 dotnet_naming_rule.public_fields_should_be_pascalcase.symbols = public_fields
 dotnet_naming_rule.public_fields_should_be_pascalcase.style = pascalcase
 
+# Constants are exempt from the _camelCase private-field rule: the codebase
+# deliberately mixes PascalCase and ALL_CAPS (UART register map / control-char
+# tables read as hardware documentation). Without this rule consts fall
+# through to private_fields and get flagged IDE1006.
+dotnet_naming_rule.constant_fields_any_case.severity = none
+dotnet_naming_rule.constant_fields_any_case.symbols = constant_fields
+dotnet_naming_rule.constant_fields_any_case.style = pascalcase
+
 # Private instance AND static fields are _camelCase in this codebase
 # (Unity-mod convention; no s_ prefix).
-dotnet_naming_rule.private_fields_should_be__camelcase.severity = suggestion
+dotnet_naming_rule.private_fields_should_be__camelcase.severity = warning
 dotnet_naming_rule.private_fields_should_be__camelcase.symbols = private_fields
 dotnet_naming_rule.private_fields_should_be__camelcase.style = _camelcase
 
-dotnet_naming_rule.private_static_readonly_fields_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.private_static_readonly_fields_should_be_pascalcase.severity = warning
 dotnet_naming_rule.private_static_readonly_fields_should_be_pascalcase.symbols = private_static_readonly_fields
 dotnet_naming_rule.private_static_readonly_fields_should_be_pascalcase.style = pascalcase
 
-dotnet_naming_rule.non_field_members_should_be_pascalcase.severity = suggestion
+dotnet_naming_rule.non_field_members_should_be_pascalcase.severity = warning
 dotnet_naming_rule.non_field_members_should_be_pascalcase.symbols = non_field_members
 dotnet_naming_rule.non_field_members_should_be_pascalcase.style = pascalcase
 
@@ -258,6 +266,10 @@ dotnet_naming_symbols.parameters.applicable_accessibilities = *
 
 dotnet_naming_symbols.public_fields.applicable_kinds = field
 dotnet_naming_symbols.public_fields.applicable_accessibilities = public, internal
+
+dotnet_naming_symbols.constant_fields.applicable_kinds = field
+dotnet_naming_symbols.constant_fields.applicable_accessibilities = *
+dotnet_naming_symbols.constant_fields.required_modifiers = const
 
 dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private, protected, protected_internal, private_protected
@@ -294,6 +306,42 @@ dotnet_diagnostic.IDE0052.severity = warning   # private member written, never r
 dotnet_diagnostic.IDE0060.severity = warning   # unused parameter
 dotnet_diagnostic.CA1823.severity = warning    # unused private field
 dotnet_diagnostic.RCS1213.severity = warning   # remove unused member declaration
+
+# Style rules the editor LSP shows as suggestions, escalated to warning so
+# build (warnings-as-errors), roslynator and dotnet format all report them
+# too. The dotnet_diagnostic form is the one the build reliably honours; the
+# :warning suffixes on the option lines above only steer IDE display.
+dotnet_diagnostic.IDE0016.severity = warning   # use throw expression
+dotnet_diagnostic.IDE0017.severity = warning   # simplify object initialization
+dotnet_diagnostic.IDE0018.severity = warning   # inline variable declaration
+dotnet_diagnostic.IDE0019.severity = warning   # pattern matching over as+null check
+dotnet_diagnostic.IDE0020.severity = warning   # pattern matching over is+cast
+dotnet_diagnostic.IDE0028.severity = warning   # simplify collection initialization
+dotnet_diagnostic.IDE0029.severity = warning   # null check can be simplified
+dotnet_diagnostic.IDE0030.severity = warning   # null check can be simplified (nullable)
+dotnet_diagnostic.IDE0031.severity = warning   # use null propagation
+dotnet_diagnostic.IDE0032.severity = warning   # use auto property
+dotnet_diagnostic.IDE0033.severity = warning   # use explicit tuple name
+dotnet_diagnostic.IDE0034.severity = warning   # simplify default expression
+dotnet_diagnostic.IDE0036.severity = warning   # modifier order
+dotnet_diagnostic.IDE0037.severity = warning   # use inferred member names
+dotnet_diagnostic.IDE0038.severity = warning   # pattern matching over is+cast (var)
+dotnet_diagnostic.IDE0039.severity = warning   # local function over anonymous function
+dotnet_diagnostic.IDE0041.severity = warning   # use is-null check
+dotnet_diagnostic.IDE0042.severity = warning   # deconstruct variable declaration
+dotnet_diagnostic.IDE0053.severity = warning   # expression-bodied lambdas
+dotnet_diagnostic.IDE0054.severity = warning   # use compound assignment
+dotnet_diagnostic.IDE0059.severity = warning   # unnecessary value assignment
+dotnet_diagnostic.IDE0063.severity = warning   # simple using statement
+dotnet_diagnostic.IDE0066.severity = warning   # use switch expression
+dotnet_diagnostic.IDE0071.severity = warning   # simplify interpolation
+dotnet_diagnostic.IDE0074.severity = warning   # use coalesce compound assignment
+dotnet_diagnostic.IDE0075.severity = warning   # simplify conditional expression
+dotnet_diagnostic.IDE0083.severity = warning   # use not pattern
+dotnet_diagnostic.IDE0090.severity = warning   # simplify new expression (target-typed)
+dotnet_diagnostic.IDE0150.severity = warning   # null check over type check
+dotnet_diagnostic.IDE0160.severity = warning   # block-scoped namespace
+dotnet_diagnostic.IDE1005.severity = warning   # conditional delegate call
 
 # Public instance fields are required by Unity serialization, the game's XML
 # save serializer and the network message layer - properties break all three.

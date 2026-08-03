@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -152,7 +153,7 @@ namespace SerialTerminal
         /// </summary>
         private static void CaptureScreenAnchor(Thing old, TerminalScreenBehaviour screen)
         {
-            if (!(old is Computer computer) || computer.ComputerScreen == null)
+            if (old is not Computer computer || computer.ComputerScreen == null)
             {
                 return;
             }
@@ -202,7 +203,7 @@ namespace SerialTerminal
             {
                 return;
             }
-            GameObject anchor = new GameObject("SerialTerminalDigitAnchor");
+            GameObject anchor = new("SerialTerminalDigitAnchor");
             anchor.transform.SetParent(go.transform, worldPositionStays: false);
             device.DigitTransform = anchor.transform;
         }
@@ -263,7 +264,7 @@ namespace SerialTerminal
         /// </summary>
         private static void RedirectReferences(GameObject go, Component old, Component replacement)
         {
-            HashSet<object> visited = new HashSet<object>(ReferenceComparer.Instance);
+            HashSet<object> visited = new(ReferenceComparer.Instance);
             foreach (MonoBehaviour behaviour in go.GetComponentsInChildren<MonoBehaviour>(includeInactive: true))
             {
                 if (behaviour == null || behaviour == old || behaviour == replacement)
@@ -385,7 +386,7 @@ namespace SerialTerminal
 
         private sealed class ReferenceComparer : IEqualityComparer<object>
         {
-            public static readonly ReferenceComparer Instance = new ReferenceComparer();
+            public static readonly ReferenceComparer Instance = new();
 
             bool IEqualityComparer<object>.Equals(object x, object y) => ReferenceEquals(x, y);
 
@@ -405,7 +406,7 @@ namespace SerialTerminal
             {
                 return null;
             }
-            GameObject go = new GameObject("SerialTerminalScreenCollider");
+            GameObject go = new("SerialTerminalScreenCollider");
             go.transform.SetParent(anchor.parent, worldPositionStays: false);
             go.transform.SetLocalPositionAndRotation(anchor.localPosition, anchor.localRotation);
             // Same layer as the prefab's other interaction triggers.
@@ -429,6 +430,8 @@ namespace SerialTerminal
         /// click the terminal and type. Prefers the dedicated screen collider; falls
         /// back to the largest collider no other interactable uses.
         /// </summary>
+        [SuppressMessage("Style", "IDE0029:Null check can be simplified",
+            Justification = "?? on UnityEngine.Object bypasses the lifetime-aware == operator; a destroyed collider must fall through to the search")]
         private static void EnsureActivateInteractable(SerialTerminalDevice device, Collider preferred)
         {
             if (device.Interactables.Exists(i => i.Action == InteractableType.Activate))
@@ -451,7 +454,7 @@ namespace SerialTerminal
 
         private static Collider FindLargestUnusedCollider(SerialTerminalDevice device)
         {
-            HashSet<Collider> used = new HashSet<Collider>();
+            HashSet<Collider> used = new();
             foreach (Interactable interactable in device.Interactables)
             {
                 if (interactable.Collider != null)
@@ -491,7 +494,7 @@ namespace SerialTerminal
 
         private static void LogInteractables(Thing thing)
         {
-            StringBuilder sb = new StringBuilder("Terminal interactables: ");
+            StringBuilder sb = new("Terminal interactables: ");
             foreach (Interactable interactable in thing.Interactables)
             {
                 sb.Append(interactable.Action).Append(
