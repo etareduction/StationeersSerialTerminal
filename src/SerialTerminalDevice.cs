@@ -20,9 +20,9 @@ using UnityEngine;
 namespace SerialTerminal
 {
     /// <summary>
-    /// Norsec TTY-6 serial terminal. A dumb glass teletype: IC10 circuits talk to it
-    /// through a 6-register memory-mapped UART (get/put), players type on it through
-    /// the terminal window; every keystroke goes straight into the input FIFO.
+    /// Norsec TTY-6 serial terminal: a 6-register memory-mapped UART (IC10 get/put)
+    /// driving a 40x20 character display, with an unbuffered keyboard input FIFO
+    /// fed from the terminal window.
     /// </summary>
     public class SerialTerminalDevice : LogicDisplay, IMemoryReadable, IMemoryWritable
     {
@@ -76,11 +76,11 @@ namespace SerialTerminal
         // buffered = one packed ascii-6 string (up to 6 chars) per get/put.
         private bool _outputBuffered;
         private bool _inputBuffered;
-        // Half-duplex switch: the keyboard controller prints keystrokes directly,
-        // without waiting for the circuit to echo them (instant feel; default off).
+        // Half-duplex switch: the keyboard controller echoes keystrokes device-side,
+        // without waiting for the circuit.
         private bool _localEcho;
-        // Volatile-RAM tracking: the terminal wipes all state when it stops
-        // operating (switched off or power lost), like a real glass TTY.
+        // Previous operating state; its falling edge (switched off or power lost)
+        // wipes all state.
         private bool _wasOperating;
         // Input queue count as last synced from the server. _rx itself only lives
         // where the simulation runs; remote clients need this for tooltips/logic reads.
@@ -190,8 +190,7 @@ namespace SerialTerminal
                         {
                             result = _rx.Dequeue();
                         }
-                        // Popping input never touches the screen cells; only the
-                        // FIFO count changed.
+                        // Only the FIFO count changed, not the screen.
                         MarkStatusDirty();
                         return result;
                     }
@@ -455,7 +454,7 @@ namespace SerialTerminal
             }
         }
 
-        /// <summary>Server side: queue raw keystrokes into the input FIFO, as-is.</summary>
+        /// <summary>Server side: queue raw keystrokes into the input FIFO.</summary>
         public void EnqueueInput(string text)
         {
             bool echoed;
@@ -465,8 +464,7 @@ namespace SerialTerminal
                 foreach (char raw in text)
                 {
                     char c = raw > CH_DEL ? '?' : raw;
-                    // Half-duplex: the keyboard controller prints directly, even
-                    // when the FIFO is full - the glass is wired to the keyboard.
+                    // Half-duplex echo happens even when the FIFO is full.
                     if (echoed) EchoChar(c);
                     if (_rx.Count >= RxCapacity)
                     {

@@ -8,11 +8,9 @@ keystroke at a time.
 ## Fiction / balance
 
 - **Norsec TTY-6 "Teletype"** — Norsec (Northern Security Systems) is the vanilla
-  logic/computing manufacturer (Logic Motherboard, Sorter Motherboard are "Norsec K-cops").
-  A dumb serial terminal fits their catalogue and the game's retro-futurist tone: it
-  *looks* like a full computer — desk unit, monitor, keyboard — but is deliberately
-  *not* one, just a glass teletype like a 1970s ADM-3A: display + keyboard + UART,
-  no processor, no storage.
+  logic/computing manufacturer (Logic Motherboard, Sorter Motherboard are "Norsec
+  K-cops"), so a serial terminal fits their catalogue. The device is modelled on a
+  1970s glass teletype (ADM-3A): display + keyboard + UART, no processor, no storage.
 - Power draw **50 W** — the vanilla convention for every display/console/IC housing.
 - Built from **Kit (Serial Terminal)** `ItemKitSerialTerminal`, printed on the
   **Electronics Printer, Tier 1**: `10 Copper, 5 Gold, 2 Steel, 2 Solder, 40 s, 3000 J`
@@ -57,10 +55,9 @@ Logic types (all vanilla — no LogicType enum patching):
 - `Error` (R): 1 when the input buffer has overflowed (sticky until CTRL 3 / flush).
 - `Color` (RW), `On`, `Power`, `RequiredPower`, `PrefabHash`, `ReferenceId`, `NameHash`: inherited.
 
-Input buffer: 256-byte FIFO (a generous hardware UART FIFO). On overflow new chars are
-dropped and the overflow flag set — real UART behaviour, and it gives IC programs a
-detectable error state. Player input is unbuffered: every keystroke goes straight into
-the FIFO (Enter sends CR 13, Backspace sends BS 8 — real terminal keyboard codes; no
+Input buffer: 256-byte FIFO. On overflow new chars are dropped and the overflow
+flag set, giving IC programs a detectable error state. Player input is unbuffered:
+keystrokes enter the FIFO directly (Enter sends CR 13, Backspace sends BS 8; no
 local line editing).
 
 The terminal has no NVRAM: leaving the operating state (switched off or power
@@ -69,11 +66,9 @@ runs the same full reset as `clr`. State persists across save/load only while
 powered (`_wasOperating` is re-derived from the restored interactable states on
 deserialize).
 
-Local echo (CTRL 8/9, default off) is the ADM-3A HALF/FULL DUPLEX switch: in half
-duplex the keyboard controller prints keystrokes device-side the moment they arrive
-(printables as-is, CR → NEL, BS → DEL), bypassing the IC10 tick (2 Hz) entirely so
-typing feels instant. Echo happens even when the FIFO is full — the glass is wired
-to the keyboard, not the host.
+Local echo (CTRL 8/9, default off): in half duplex the keyboard controller prints
+keystrokes device-side on arrival (printables as-is, CR → NEL, BS → DEL), bypassing
+the IC10 tick (2 Hz) entirely. Echo happens even when the FIFO is full.
 
 ## Player interaction
 
@@ -171,24 +166,4 @@ running through Proton. No deploy step, just build and restart the game. (The ga
 XML only for real mods in the mods folder — a bare DLL in `BepInEx/plugins` would
 load code but get no recipes/localization.)
 
-## IC10 usage example
-
-```
-alias term d0
-# print a prompt
-put term 1 STR("READY.")
-put term 0 133         # NEL: newline (CR+LF)
-loop:
-yield
-l r0 term Quantity     # chars waiting?
-blez r0 loop
-get r1 term 0          # pop keystroke (Enter = CR 13, Backspace = BS 8)
-bne r1 13 print
-move r1 133            # echo Enter as a full newline
-print:
-put term 0 r1          # echo it back
-j loop
-```
-
-More complete examples (rubout handling, buffered mode, cursor addressing) live in
-`examples/`.
+Usage examples live in `mod/API.md` and `examples/`.

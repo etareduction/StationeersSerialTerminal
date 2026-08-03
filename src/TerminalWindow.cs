@@ -10,13 +10,11 @@ using UnityEngine;
 namespace SerialTerminal
 {
     /// <summary>
-    /// The interactive terminal window, registered with the game's own
-    /// ImGuiWindowManager (drawn every frame from ImGuiManager.RenderOverlay;
-    /// the manager also handles the Typing input state and mouse-pointer mode).
-    /// One window at a time: a scrollback-less fixed screen (mirroring the
-    /// in-world surface). Input is unbuffered: every keystroke goes straight to
-    /// the device FIFO (Enter sends CR, Backspace sends BS) — there is no local
-    /// line editing.
+    /// The interactive terminal window, registered with the game's
+    /// ImGuiWindowManager (which also handles the Typing input state and
+    /// mouse-pointer mode). One window at a time, no scrollback, mirroring the
+    /// in-world surface. Keystrokes are forwarded raw to the device FIFO
+    /// (Enter sends CR, Backspace BS); no local line editing.
     /// </summary>
     public sealed class TerminalWindow : UI.ImGuiUi.ImGuiWindows.ImGuiWindow
     {
@@ -67,8 +65,6 @@ namespace SerialTerminal
             _current = null;
             MouseModeController.RemoveModal(Modal);
             InventoryManager.EnablePlayerKeys = true;
-            // Explicit null check: ?. would bypass UnityEngine.Object's lifetime-aware
-            // == operator and could call into a destroyed manager.
             if (CursorManager.Instance != null)
             {
                 CursorManager.Instance.OnApplicationFocus(focus: true);
@@ -148,8 +144,8 @@ namespace SerialTerminal
         /// <summary>
         /// Forwards this frame's typed characters (Unity legacy input, includes
         /// OS key repeat) to the device. Enter arrives as '\n' or '\r' depending
-        /// on platform — both are sent as CR (13), like a real terminal keyboard.
-        /// Backspace arrives as '\b' (8) and is sent through unchanged.
+        /// on platform; both are sent as CR (13). Backspace arrives as '\b' (8)
+        /// and is sent through unchanged.
         /// </summary>
         private static void SendKeystrokes(SerialTerminalDevice device)
         {

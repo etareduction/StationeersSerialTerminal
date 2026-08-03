@@ -86,8 +86,7 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 | 133  | NEL  | Next line: carriage return + line feed in one code            |
 
 Other codes below 32 are ignored. Codes above 255 are ignored. For a full
-newline print NEL (133), or CR then LF — a bare LF leaves the column unchanged,
-matching traditional teletype behaviour.
+newline print NEL (133), or CR then LF — a bare LF leaves the column unchanged.
 
 ## Logic variables (`l`/`s`)
 
@@ -103,11 +102,11 @@ matching traditional teletype behaviour.
 ## Player input
 
 - Click the monitor ("Open Terminal") to open the terminal window. Input is
-  **unbuffered**: every keystroke goes straight into the input FIFO as it is
-  typed — there is no input line and no local editing.
-- **Enter sends CR (13)**, matching a standard terminal keyboard. **Backspace
-  sends BS (8).** A program that wants line editing must interpret those itself
-  (e.g. echo DEL (127) to erase a character, NEL (133) on Enter).
+  **unbuffered**: each keystroke enters the input FIFO as it is typed — there is
+  no input line and no local editing.
+- **Enter sends CR (13)**, **Backspace sends BS (8)**. A program that wants line
+  editing must interpret those itself (e.g. echo DEL (127) to erase a character,
+  NEL (133) on Enter).
 - By default the terminal is **full duplex** — nothing appears on the screen unless
   the circuit prints it. An interactive program should echo popped characters back
   to DATA (see the loop below).
@@ -124,9 +123,8 @@ matching traditional teletype behaviour.
 
 ## Latency and throughput
 
-An IC10 runs 128 lines per tick, 2 ticks per second, so a program-echoed keystroke
-takes up to half a second to appear (plus a network round trip on a multiplayer
-client). Two tools make the terminal feel immediate:
+A program-echoed keystroke takes up to half a second to appear (IC10 tick rate,
+plus a network round trip on a multiplayer client). Two mitigations:
 
 - **Local echo (CTRL 9)** removes the circuit from the echo path entirely — typed
   characters appear the same frame. Best for anything interactive.
