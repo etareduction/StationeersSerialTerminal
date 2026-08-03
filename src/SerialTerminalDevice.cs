@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using Assets.Scripts;
@@ -407,11 +408,20 @@ namespace SerialTerminal
                 if (!GameManager.IsBatchMode
                     && interaction.SourceThing is Entity entity && entity.IsLocalPlayer)
                 {
-                    TerminalWindow.Open(this);
+                    OpenTerminalWindow(this);
                 }
                 return action.Succeed();
             }
             return base.InteractWith(interactable, interaction, doAction);
+        }
+
+        // NoInlining keeps TerminalWindow (whose ImGui base class the dedicated
+        // server cannot load) out of InteractWith's JIT: InteractWith runs on the
+        // server for every interaction, this helper only for the local player.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void OpenTerminalWindow(SerialTerminalDevice device)
+        {
+            TerminalWindow.Open(device);
         }
 
         public override string GetContextualName(Interactable interactable)

@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.CompilerServices;
 using Assets.Scripts;
 using Assets.Scripts.UI;
 using HarmonyLib;
@@ -204,9 +205,12 @@ namespace SerialTerminal
     }
 
     /// <summary>
-    /// Lives next to SerialTerminalDevice on the prefab. Owns the screen quad,
-    /// its RenderTexture and the per-device ImGui mesh renderer; repaints the
-    /// texture whenever the terminal content version changes.
+    /// Lives next to SerialTerminalDevice on the prefab; carries the serialized
+    /// screen pose captured at prefab-build time and, on clients, hands off to
+    /// the ImGui renderer component. Deliberately free of ImGui-typed members:
+    /// the dedicated server ships no RG.ImGui assemblies, and one such field is
+    /// enough to make this class - and with it the whole prefab build - fail to
+    /// load there (TypeLoadException at AddComponent).
     /// </summary>
     public class TerminalScreenBehaviour : MonoBehaviour
     {
@@ -217,11 +221,38 @@ namespace SerialTerminal
         public float ScreenWorldWidth;
         public float ScreenWorldHeight;
 
+        private void LateUpdate()
+        {
+            if (!GameManager.IsBatchMode && GetComponent<SerialTerminalDevice>() != null)
+            {
+                AttachRenderer();
+            }
+            enabled = false;
+        }
+
+        // NoInlining keeps TerminalScreenRenderer (ImGui-typed fields) out of this
+        // method's JIT: on the server this is never called, so the type never loads.
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private void AttachRenderer()
+        {
+            gameObject.AddComponent<TerminalScreenRenderer>();
+        }
+    }
+
+    /// <summary>
+    /// Owns the screen quad, its RenderTexture and the per-device ImGui mesh
+    /// renderer; repaints the texture whenever the terminal content version
+    /// changes. Attached at runtime by TerminalScreenBehaviour, on clients only:
+    /// this class cannot load on the dedicated server (fields need RG.ImGui.Unity).
+    /// </summary>
+    public class TerminalScreenRenderer : MonoBehaviour
+    {
         // One quad geometry for every terminal instance; per-device state is the
         // RenderTexture/material, not the mesh. Never destroyed.
         private static Mesh _sharedQuadMesh;
 
         private SerialTerminalDevice _device;
+        private TerminalScreenBehaviour _data;
         private RenderTexture _texture;
         private CommandBuffer _commandBuffer;
         private ImGuiRendererMesh _renderer;
@@ -233,11 +264,12 @@ namespace SerialTerminal
         private void Awake()
         {
             _device = GetComponent<SerialTerminalDevice>();
+            _data = GetComponent<TerminalScreenBehaviour>();
         }
 
         private void LateUpdate()
         {
-            if (_device == null || GameManager.IsBatchMode)
+            if (_device == null || _data == null)
             {
                 enabled = false;
                 return;
@@ -294,10 +326,10 @@ namespace SerialTerminal
             // else the LogicDisplay panel width (square).
             float width;
             float height;
-            if (ScreenWorldWidth > 0f && ScreenWorldHeight > 0f)
+            if (_data.ScreenWorldWidth > 0f && _data.ScreenWorldHeight > 0f)
             {
-                width = ScreenWorldWidth;
-                height = ScreenWorldHeight;
+                width = _data.ScreenWorldWidth;
+                height = _data.ScreenWorldHeight;
             }
             else
             {
@@ -328,8 +360,8 @@ namespace SerialTerminal
 
             // The anchor may be an inactive GameObject (the disabled vanilla canvas),
             // so the quad is parented to the device and copies the anchor's world pose.
-            Transform anchor = ScreenAnchor != null
-                ? ScreenAnchor
+            Transform anchor = _data.ScreenAnchor != null
+                ? _data.ScreenAnchor
                 : (_device.DigitTransform != null ? _device.DigitTransform : _device.transform);
 
             // Double-sided mesh: canvas/quad facing conventions differ per prefab, and

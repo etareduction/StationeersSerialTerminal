@@ -3,7 +3,7 @@
   <Name>Serial Terminal</Name>
   <ModID>SerialTerminal</ModID>
   <Author>etareduction</Author>
-  <Version>0.4.2</Version>
+  <Version>0.4.3</Version>
   <Description>Adds the Norsec TTY-6 Serial Terminal: a free-standing computer block - monitor, desk unit and keyboard - that is secretly just a glass teletype. No processor, no storage: your IC10 circuits print to it and read typed input from it through a classic 6-register memory-mapped UART (get/put). Click the screen to type; every keystroke goes straight to the wire.
 
 IC10 quick reference (device d0):

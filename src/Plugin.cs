@@ -13,7 +13,7 @@ namespace SerialTerminal
     {
         public const string GUID = "com.etareduction.serialterminal";
         public const string NAME = "SerialTerminal";
-        public const string VERSION = "0.4.2";
+        public const string VERSION = "0.4.3";
 
         public static readonly Mod MOD = new Mod(NAME, VERSION);
 
