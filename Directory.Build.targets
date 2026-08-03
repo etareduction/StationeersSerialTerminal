@@ -1,0 +1,9 @@
+<Project>
+
+  <!-- Late import so IntermediateOutputPath is defined: keep the XML doc file
+       (needed only for IDE0005 analysis) out of the deployable mod/ folder. -->
+  <PropertyGroup>
+    <DocumentationFile>$(IntermediateOutputPath)$(AssemblyName).xml</DocumentationFile>
+  </PropertyGroup>
+
+</Project>

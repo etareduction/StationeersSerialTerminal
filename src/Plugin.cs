@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using Assets.Scripts;
 using BepInEx;
 using BepInEx.Logging;
@@ -26,6 +27,10 @@ namespace SerialTerminal
             AccessTools.StaticFieldRefAccess<Dictionary<int, Localization.LocalizationThingDat>>(
                 AccessTools.Field(typeof(Localization), "ThingLocalized"));
 
+        [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
+            Justification = "Disposing the Harmony instance would unpatch; patches must live for the process lifetime")]
+        [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
+            Justification = "Unity message, called by the engine")]
         private void Awake()
         {
             if (_initialized)

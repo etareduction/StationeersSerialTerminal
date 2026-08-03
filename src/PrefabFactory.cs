@@ -4,10 +4,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using Assets.Scripts;
 using Assets.Scripts.Objects;
 using Assets.Scripts.Objects.Electrical;
-using Assets.Scripts.Objects.Items;
 using Assets.Scripts.Sound;
 using LaunchPadBooster.Utils;
 using UnityEngine;
@@ -160,8 +158,7 @@ namespace SerialTerminal
             }
             GameObject screenGo = computer.ComputerScreen;
             screen.ScreenAnchor = screenGo.transform;
-            RectTransform rect = screenGo.GetComponent<RectTransform>();
-            if (rect != null)
+            if (screenGo.TryGetComponent(out RectTransform rect))
             {
                 Vector3 scale = rect.lossyScale;
                 screen.ScreenWorldWidth = Mathf.Abs(rect.rect.width * scale.x);
@@ -401,7 +398,7 @@ namespace SerialTerminal
         /// (on the Computer prefab that was the root collider, which the door/slot/button
         /// triggers all occlude).
         /// </summary>
-        private static Collider CreateScreenCollider(SerialTerminalDevice device, TerminalScreenBehaviour screen)
+        private static BoxCollider CreateScreenCollider(SerialTerminalDevice device, TerminalScreenBehaviour screen)
         {
             Transform anchor = screen.ScreenAnchor;
             if (anchor == null || screen.ScreenWorldWidth <= 0f || screen.ScreenWorldHeight <= 0f)
@@ -410,8 +407,7 @@ namespace SerialTerminal
             }
             GameObject go = new GameObject("SerialTerminalScreenCollider");
             go.transform.SetParent(anchor.parent, worldPositionStays: false);
-            go.transform.localPosition = anchor.localPosition;
-            go.transform.localRotation = anchor.localRotation;
+            go.transform.SetLocalPositionAndRotation(anchor.localPosition, anchor.localRotation);
             // Same layer as the prefab's other interaction triggers.
             go.layer = anchor.gameObject.layer;
             foreach (Interactable interactable in device.Interactables)

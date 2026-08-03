@@ -17,7 +17,7 @@ namespace SerialTerminal
     /// the device FIFO (Enter sends CR, Backspace sends BS) — there is no local
     /// line editing.
     /// </summary>
-    public class TerminalWindow : UI.ImGuiUi.ImGuiWindows.ImGuiWindow
+    public sealed class TerminalWindow : UI.ImGuiUi.ImGuiWindows.ImGuiWindow
     {
         // Window auto-closes when the player walks this far from the terminal (meters).
         private const float CloseDistance = 8f;
@@ -64,7 +64,12 @@ namespace SerialTerminal
             _current = null;
             MouseModeController.RemoveModal(Modal);
             InventoryManager.EnablePlayerKeys = true;
-            CursorManager.Instance?.OnApplicationFocus(focus: true);
+            // Explicit null check: ?. would bypass UnityEngine.Object's lifetime-aware
+            // == operator and could call into a destroyed manager.
+            if (CursorManager.Instance != null)
+            {
+                CursorManager.Instance.OnApplicationFocus(focus: true);
+            }
         }
 
         public override void DrawContent()
@@ -86,8 +91,8 @@ namespace SerialTerminal
             float charW = ImGui.CalcTextSize("M").x;
             float lineH = ImGui.GetTextLineHeight();
             Vector2 screenSize = new Vector2(
-                device.ColumnCount * charW + 16f,
-                device.RowCount * lineH + 16f);
+                SerialTerminalDevice.Columns * charW + 16f,
+                SerialTerminalDevice.Rows * lineH + 16f);
 
             if (_justOpened)
             {
@@ -104,7 +109,7 @@ namespace SerialTerminal
             bool powered = device.OnOff && device.Powered;
 
             ImGui.PushStyleColor(ImGuiCol.ChildBg, TerminalDraw.ScreenBackground);
-            ImGui.BeginChild("##terminalscreen", screenSize, true,
+            ImGui.BeginChild("##terminalscreen", screenSize, border: true,
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
             if (powered)
             {

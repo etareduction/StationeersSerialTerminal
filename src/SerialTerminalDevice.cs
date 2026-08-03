@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
@@ -9,10 +11,8 @@ using Assets.Scripts.Localization2;
 using Assets.Scripts.Networking;
 using Assets.Scripts.Objects;
 using Assets.Scripts.Objects.Electrical;
-using Assets.Scripts.Objects.Entities;
 using Assets.Scripts.Objects.Motherboards;
 using Assets.Scripts.Objects.Pipes;
-using Assets.Scripts.UI;
 using Assets.Scripts.Util;
 using Rendering;
 using UnityEngine;
@@ -95,10 +95,6 @@ namespace SerialTerminal
         private int _cacheCursorCol;
 
         public int ScreenVersion => _version;
-
-        public int RowCount => Rows;
-
-        public int ColumnCount => Columns;
 
         /// <summary>Input queue length; live where simulating, last synced value on clients.</summary>
         private int DisplayRxCount
@@ -219,6 +215,14 @@ namespace SerialTerminal
             }
         }
 
+        // The game's own IC10 interpreter throws System.StackOverflowException for a
+        // bad `put` and converts it to the StackOverFlow chip error by type check
+        // (ProgrammableChip.WriteMemory does the same); a custom type would surface
+        // as Unknown instead.
+        [SuppressMessage("Usage", "CA2201:Do not raise reserved exception types",
+            Justification = "Matches the game's IC10 error convention")]
+        [SuppressMessage("Design", "MA0012:Do not raise reserved exception type",
+            Justification = "Matches the game's IC10 error convention")]
         public void WriteMemory(int address, double value)
         {
             bool screenChanged = true;
@@ -712,7 +716,7 @@ namespace SerialTerminal
             foreach (char c in text)
             {
                 if (c == '\\') sb.Append("\\\\");
-                else if (c < ' ' || c == CH_DEL) sb.Append("\\x").Append(((int)c).ToString("x2"));
+                else if (c < ' ' || c == CH_DEL) sb.Append("\\x").Append(((int)c).ToString("x2", CultureInfo.InvariantCulture));
                 else sb.Append(c);
             }
             return sb.ToString();
@@ -737,7 +741,7 @@ namespace SerialTerminal
                     case 'x':
                         if (i + 2 < text.Length
                             && int.TryParse(text.Substring(i + 1, 2),
-                                System.Globalization.NumberStyles.HexNumber, null, out int code))
+                                NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int code))
                         {
                             sb.Append((char)code);
                             i += 2;

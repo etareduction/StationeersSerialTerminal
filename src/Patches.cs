@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Assets.Scripts.Objects;
 using HarmonyLib;
 
@@ -11,6 +12,8 @@ namespace SerialTerminal
     /// setups only run over prefabs already registered via AddPrefabs).
     /// </summary>
     [HarmonyPatch(typeof(Prefab), nameof(Prefab.LoadAll))]
+    [SuppressMessage("Design", "MA0182:Avoid unused internal types",
+        Justification = "Discovered and applied by Harmony's PatchAll attribute scan")]
     internal static class PrefabLoadAllPatch
     {
         [HarmonyPrefix]

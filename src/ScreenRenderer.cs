@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Assets.Scripts;
 using Assets.Scripts.UI;
@@ -69,15 +70,12 @@ namespace SerialTerminal
     {
         private static IntPtr _context = IntPtr.Zero;
 
-        private static readonly AccessTools.FieldRef<ImGuiManager> CurrentManagerRef;
-        private static readonly AccessTools.FieldRef<ImGuiManager, ShaderResourcesAsset> ShadersRef;
-
-        static OffscreenImGui()
-        {
-            CurrentManagerRef = AccessTools.StaticFieldRefAccess<ImGuiManager>(
+        private static readonly AccessTools.FieldRef<ImGuiManager> CurrentManagerRef =
+            AccessTools.StaticFieldRefAccess<ImGuiManager>(
                 AccessTools.Field(typeof(ImGuiManager), "current"));
-            ShadersRef = AccessTools.FieldRefAccess<ImGuiManager, ShaderResourcesAsset>("_shaders");
-        }
+
+        private static readonly AccessTools.FieldRef<ImGuiManager, ShaderResourcesAsset> ShadersRef =
+            AccessTools.FieldRefAccess<ImGuiManager, ShaderResourcesAsset>("_shaders");
 
         private static ImGuiManager Manager => CurrentManagerRef();
 
@@ -168,10 +166,10 @@ namespace SerialTerminal
                 ImFontPtr font = TerminalDraw.PickFont(io);
                 float charW = font.GetCharAdvance('M');
                 float lineH = font.FontSize;
-                float pad = 16f;
+                const float pad = 16f;
                 float scale = Mathf.Min(
-                    (target.width - pad) / (device.ColumnCount * charW),
-                    (target.height - pad) / (device.RowCount * lineH));
+                    (target.width - pad) / (SerialTerminalDevice.Columns * charW),
+                    (target.height - pad) / (SerialTerminalDevice.Rows * lineH));
                 io.FontGlobalScale = Mathf.Max(0.1f, scale);
 
                 ImGui.NewFrame();
@@ -221,6 +219,8 @@ namespace SerialTerminal
         public float ScreenWorldWidth;
         public float ScreenWorldHeight;
 
+        [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
+            Justification = "Unity message, called by the engine")]
         private void LateUpdate()
         {
             if (!GameManager.IsBatchMode && GetComponent<SerialTerminalDevice>() != null)
@@ -245,6 +245,9 @@ namespace SerialTerminal
     /// changes. Attached at runtime by TerminalScreenBehaviour, on clients only:
     /// this class cannot load on the dedicated server (fields need RG.ImGui.Unity).
     /// </summary>
+    [RequireComponent(typeof(SerialTerminalDevice), typeof(TerminalScreenBehaviour))]
+    [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
+        Justification = "Unity component; IDisposable is not part of the MonoBehaviour lifecycle - OnDestroy releases everything")]
     public class TerminalScreenRenderer : MonoBehaviour
     {
         // One quad geometry for every terminal instance; per-device state is the
@@ -261,12 +264,16 @@ namespace SerialTerminal
         private int _renderedVersion = -1;
         private bool _setupFailed;
 
+        [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
+            Justification = "Unity message, called by the engine")]
         private void Awake()
         {
             _device = GetComponent<SerialTerminalDevice>();
             _data = GetComponent<TerminalScreenBehaviour>();
         }
 
+        [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
+            Justification = "Unity message, called by the engine")]
         private void LateUpdate()
         {
             if (_device == null || _data == null)
@@ -304,6 +311,8 @@ namespace SerialTerminal
             }
         }
 
+        [SuppressMessage("Maintainability", "CA1508:Avoid dead conditional code",
+            Justification = "False positive: CreateRenderer returns null when the game's shader resources are missing")]
         private bool EnsureSetup()
         {
             if (_quadRenderer != null)
@@ -371,8 +380,7 @@ namespace SerialTerminal
             quad.layer = anchor.gameObject.layer;
             quad.transform.SetParent(_device.transform, worldPositionStays: false);
             // Nudged off the panel face so the quad doesn't z-fight with the monitor mesh.
-            quad.transform.position = anchor.position + anchor.forward * 0.002f;
-            quad.transform.rotation = anchor.rotation;
+            quad.transform.SetPositionAndRotation(anchor.position + anchor.forward * 0.002f, anchor.rotation);
             quad.transform.localScale = new Vector3(width, height, 1f);
             if (_sharedQuadMesh == null)
             {
@@ -424,9 +432,9 @@ namespace SerialTerminal
         private static Shader FindScreenShader()
         {
             string[] candidates = { "Unlit/Texture", "UI/Default", "Sprites/Default", "Standard" };
-            foreach (string name in candidates)
+            foreach (string shaderName in candidates)
             {
-                Shader shader = Shader.Find(name);
+                Shader shader = Shader.Find(shaderName);
                 if (shader != null)
                 {
                     return shader;
@@ -435,6 +443,8 @@ namespace SerialTerminal
             return null;
         }
 
+        [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
+            Justification = "Unity message, called by the engine")]
         private void OnDestroy()
         {
             if (_renderer != null)
