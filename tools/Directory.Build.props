@@ -1,0 +1,5 @@
+<!-- Shadows the repo-root Directory.Build.props: MSBuild imports only the
+     nearest one, so tooling projects under tools/ opt out of the mod's
+     analyzer and code-style configuration. -->
+<Project>
+</Project>

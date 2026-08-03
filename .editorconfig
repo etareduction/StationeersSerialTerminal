@@ -400,6 +400,11 @@ dotnet_diagnostic.CA1812.severity = none
 # Static state is how a BepInEx plugin works (single instance per process).
 dotnet_diagnostic.CA2211.severity = none       # non-constant static fields visible
 
+# Deprecated by Meziantou in favour of CA1822, which already runs here — and
+# unlike CA1822 they false-positive on C# 14 extension members (3.0.138).
+dotnet_diagnostic.MA0038.severity = none       # make method static (deprecated)
+dotnet_diagnostic.MA0041.severity = none       # make property static (deprecated)
+
 # BepInEx convention: the plugin id constant is named GUID and holds a
 # reverse-DNS string, not a System.Guid.
 dotnet_diagnostic.CA1720.severity = none       # identifier contains type name

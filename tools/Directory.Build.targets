@@ -1,0 +1,5 @@
+<!-- Shadows the repo-root Directory.Build.targets: without this, building a
+     tooling project would trigger the Verify target, which runs the runner,
+     which builds the tooling project — a cycle. -->
+<Project>
+</Project>

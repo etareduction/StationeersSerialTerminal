@@ -14,6 +14,7 @@ using Assets.Scripts.Objects.Electrical;
 using Assets.Scripts.Objects.Motherboards;
 using Assets.Scripts.Objects.Pipes;
 using Assets.Scripts.Util;
+using LaunchPadBooster.Networking;
 using Rendering;
 using SerialTerminal.Networking;
 using SerialTerminal.Windows;
@@ -513,11 +514,11 @@ namespace SerialTerminal.Devices
             }
             else
             {
-                _ = new TerminalInputMessage
+                new TerminalInputMessage
                 {
                     TerminalId = ReferenceId,
                     Text = text
-                }.SendToServer();
+                }.SendToHost();
             }
         }
 
@@ -730,7 +731,7 @@ namespace SerialTerminal.Devices
                 lock (_stateLock)
                 {
                     data.ScreenText = ScreenToString();
-                    data.InputBuffer = EscapeBuffer(new string(_rx.ToArray()));
+                    data.InputBuffer = EscapeBuffer(new string([.. _rx]));
                     data.CursorRow = _cursorRow;
                     data.CursorCol = _cursorCol;
                     data.Overflow = _overflow;

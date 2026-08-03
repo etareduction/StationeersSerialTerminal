@@ -89,7 +89,7 @@ namespace SerialTerminal.Windows
             InventoryManager.EnablePlayerKeys = false;
 
             ImGuiIOPtr io = ImGui.GetIO();
-            ImGui.PushFont(TerminalDraw.PickFont(io));
+            ImGui.PushFont(io.TerminalFont);
 
             float charW = ImGui.CalcTextSize("M").x;
             float lineH = ImGui.GetTextLineHeight();
@@ -116,7 +116,7 @@ namespace SerialTerminal.Windows
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
             if (powered)
             {
-                TerminalDraw.DrawBuffer(device);
+                device.DrawBuffer();
             }
             ImGui.EndChild();
             ImGui.PopStyleColor();

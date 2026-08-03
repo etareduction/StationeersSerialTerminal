@@ -17,7 +17,7 @@ namespace SerialTerminal
     {
         public const string GUID = "com.etareduction.serialterminal";
         public const string NAME = "SerialTerminal";
-        public const string VERSION = "0.4.3";
+        public const string VERSION = "0.5.0";
 
         public static readonly Mod MOD = new(NAME, VERSION);
 
@@ -47,7 +47,7 @@ namespace SerialTerminal
             Log = Logger;
 
             MOD.AddSaveDataType<SerialTerminalSaveData>();
-            MOD.Networking.RegisterLegacyMessage<TerminalInputMessage>();
+            MOD.Networking.RegisterMessage<TerminalInputMessage>();
 
             // LanguageFolder.LoadAll (its only caller is SetLanguage) rebuilds the
             // localization tables and fires OnLanguageChanged right after; run once
@@ -56,7 +56,7 @@ namespace SerialTerminal
             AddLocalizationFallback();
 
             new Harmony(GUID).PatchAll(typeof(SerialTerminalPlugin).Assembly);
-            Log.LogInfo("SerialTerminal " + VERSION + " initialized");
+            Log.LogInfo($"SerialTerminal {VERSION} initialized");
         }
 
         /// <summary>

@@ -182,30 +182,30 @@ namespace SerialTerminal.Display
             var mesh = new Mesh
             {
                 name = "SerialTerminalScreenMesh",
-                vertices = new[]
-            {
+                vertices =
+            [
                 // front (visible from -Z, like Unity's Quad primitive)
                 new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
                 new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f),
                 // back (visible from +Z)
                 new Vector3(-0.5f, -0.5f, 0f), new Vector3(0.5f, -0.5f, 0f),
                 new Vector3(-0.5f, 0.5f, 0f), new Vector3(0.5f, 0.5f, 0f)
-            },
-                uv = new[]
-            {
+            ],
+                uv =
+            [
                 new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(0f, 1f), new Vector2(1f, 1f),
                 new Vector2(1f, 0f), new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 1f)
-            },
-                normals = new[]
-            {
+            ],
+                normals =
+            [
                 -Vector3.forward, -Vector3.forward, -Vector3.forward, -Vector3.forward,
                 Vector3.forward, Vector3.forward, Vector3.forward, Vector3.forward
-            },
-                triangles = new[]
-            {
+            ],
+                triangles =
+            [
                 0, 2, 1, 1, 2, 3,
                 4, 5, 6, 6, 5, 7
-            }
+            ]
             };
             mesh.RecalculateBounds();
             return mesh;
@@ -213,7 +213,7 @@ namespace SerialTerminal.Display
 
         private static Shader FindScreenShader()
         {
-            string[] candidates = { "Unlit/Texture", "UI/Default", "Sprites/Default", "Standard" };
+            string[] candidates = ["Unlit/Texture", "UI/Default", "Sprites/Default", "Standard"];
             foreach (string shaderName in candidates)
             {
                 Shader shader = Shader.Find(shaderName);

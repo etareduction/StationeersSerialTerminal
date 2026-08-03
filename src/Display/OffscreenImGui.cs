@@ -115,7 +115,7 @@ namespace SerialTerminal.Display
                 io.DeltaTime = Mathf.Max(Time.unscaledDeltaTime, 0.001f);
 
                 // Scale the shared font so the whole cell grid fills the texture.
-                ImFontPtr font = TerminalDraw.PickFont(io);
+                ImFontPtr font = io.TerminalFont;
                 float charW = font.GetCharAdvance('M');
                 float lineH = font.FontSize;
                 const float pad = 16f;
@@ -134,7 +134,7 @@ namespace SerialTerminal.Display
                     | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoCollapse
                     | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoInputs);
                 ImGui.PushFont(font);
-                TerminalDraw.DrawBuffer(device);
+                device.DrawBuffer();
                 ImGui.PopFont();
                 ImGui.End();
                 ImGui.PopStyleColor();

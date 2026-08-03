@@ -14,9 +14,12 @@
     simplification analyzers (IDE0001 and friends) need a workspace and never
     fire from csc - referencing Microsoft.CodeAnalysis.CSharp.CodeStyle
     explicitly does not change that, the analyzers load and stay silent. Only
-    `dotnet format` reports them, and only out of process. Roslynator is a
-    second analyzer host: it re-runs the packages and adds the
-    NotConfigurable diagnostics neither of the other two surfaces.
+    `dotnet format` reports them, and only out of process. RoslynatorRunner
+    (tools/) is a second analyzer host: it re-runs the packages and surfaces
+    the NotConfigurable diagnostics neither of the other two reports. It
+    replaced the roslynator CLI, whose bundled pre-Roslyn-5 compiler cannot
+    parse C# 14 `extension` blocks; the runner analyzes on the SDK's current
+    Roslyn instead.
 
     Costs roughly 13s on top of a ~2s build. For a fast inner loop:
 
@@ -32,12 +35,6 @@
           DependsOnTargets="Build"
           Condition="'$(SkipVerify)' != 'true' AND '$(VerifyRunning)' != '1'">
 
-    <!-- roslynator is a local tool; a fresh clone has not fetched it yet. -->
-    <Exec Command="dotnet tool restore"
-          WorkingDirectory="$(MSBuildThisFileDirectory)"
-          EnvironmentVariables="VerifyRunning=1"
-          StandardOutputImportance="low" />
-
     <!-- ErrorAndContinue on both: a failing gate still fails the build, but
          the other one runs, so a single build reports every finding rather
          than the first tool's worth.
@@ -51,7 +48,7 @@
           StandardOutputImportance="high"
           ContinueOnError="ErrorAndContinue" />
 
-    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level info --report-not-configurable --exclude &quot;**/obj/**&quot;"
+    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)tools/RoslynatorRunner/RoslynatorRunner.csproj&quot; -c Release -- --severity info &quot;$(MSBuildProjectFullPath)&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)"
           EnvironmentVariables="VerifyRunning=1"
           StandardOutputImportance="high"
@@ -70,17 +67,12 @@
     decision, not a list of defects - which is why it does not gate.
     Default verbosity on purpose: -v minimal collapses it to a bare count.
 
-    The exclude glob keeps generated sources (obj/*.AssemblyInfo.cs) out of the
-    tally: report-not-configurable un-suppresses their unused usings, and a
+    Generated sources (obj/*.AssemblyInfo.cs) stay out of the tally: a
     permanent floor of findings nobody can act on makes the count useless.
+    The runner filters them by path.
   -->
   <Target Name="VerifyDeep" DependsOnTargets="Build">
-    <Exec Command="dotnet tool restore"
-          WorkingDirectory="$(MSBuildThisFileDirectory)"
-          EnvironmentVariables="VerifyRunning=1"
-          StandardOutputImportance="low" />
-
-    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level hidden --report-not-configurable --exclude &quot;**/obj/**&quot;"
+    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)tools/RoslynatorRunner/RoslynatorRunner.csproj&quot; -c Release -- --severity hidden &quot;$(MSBuildProjectFullPath)&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)"
           EnvironmentVariables="VerifyRunning=1"
           StandardOutputImportance="high"

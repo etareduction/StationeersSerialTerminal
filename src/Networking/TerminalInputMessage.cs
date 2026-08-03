@@ -6,24 +6,24 @@ using SerialTerminal.Devices;
 namespace SerialTerminal.Networking
 {
     /// <summary>Client → server: raw keystrokes the player typed into a terminal.</summary>
-    public class TerminalInputMessage : ModNetworkMessage<TerminalInputMessage>
+    public class TerminalInputMessage : INetworkMessage
     {
         public long TerminalId;
         public string Text;
 
-        public override void Serialize(RocketBinaryWriter writer)
+        public void Serialize(RocketBinaryWriter writer)
         {
             writer.WriteInt64(TerminalId);
             writer.WriteString(Text ?? string.Empty);
         }
 
-        public override void Deserialize(RocketBinaryReader reader)
+        public void Deserialize(RocketBinaryReader reader)
         {
             TerminalId = reader.ReadInt64();
             Text = reader.ReadString();
         }
 
-        public override void Process(long hostId)
+        public void Process(long clientId)
         {
             if (!GameManager.RunSimulation)
             {

@@ -26,11 +26,11 @@ namespace SerialTerminal.Prefabs
 
         /// <summary>Tried in order. StructureComputer = "Computer (Modern)".</summary>
         private static readonly string[] SourcePrefabFallbacks =
-        {
+        [
             "StructureComputer",
             "StructureConsoleLED5Large",
             "StructureConsoleLED1x2"
-        };
+        ];
 
         private static bool _created;
         private static GameObject _root;
@@ -85,7 +85,7 @@ namespace SerialTerminal.Prefabs
                 // multiplayer join validation) and appends to SourcePrefabs on the
                 // NEXT Prefab.LoadAll - our prefix is inside the current one, so the
                 // direct adds below cover it. Both sides dedupe.
-                SerialTerminalPlugin.MOD.AddPrefabs(new[] { terminal.gameObject, kit.gameObject });
+                SerialTerminalPlugin.MOD.AddPrefabs([terminal.gameObject, kit.gameObject]);
                 if (!sourcePrefabs.Contains(terminal)) sourcePrefabs.Add(terminal);
                 if (!sourcePrefabs.Contains(kit)) sourcePrefabs.Add(kit);
                 _created = true;
@@ -459,7 +459,7 @@ namespace SerialTerminal.Prefabs
 
         private static Collider FindLargestUnusedCollider(SerialTerminalDevice device)
         {
-            HashSet<Collider> used = new();
+            HashSet<Collider> used = [];
             foreach (Interactable interactable in device.Interactables)
             {
                 if (interactable.Collider != null)

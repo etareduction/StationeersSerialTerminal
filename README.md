@@ -48,9 +48,11 @@ a finding in any of them fails the build:
 - **`dotnet format --verify-no-changes --severity info`** — whitespace, style
   and analyzer fixers. The only gate that reports the simplification rules, so
   a clean compile alone does not mean a clean tree.
-- **`roslynator analyze --severity-level info --report-not-configurable`** — a
-  second analyzer host, reaching info severity and the `NotConfigurable`
-  diagnostics the other two never surface.
+- **`tools/RoslynatorRunner`** — a second analyzer host, reaching info
+  severity and the `NotConfigurable` diagnostics the other two never surface.
+  It re-runs the project's analyzer packages on the SDK's current Roslyn
+  (the roslynator CLI it replaced bundles an older compiler that cannot parse
+  C# 14 `extension` blocks).
 
 The two out-of-process gates cost about 13s on top of a ~2s compile. For a
 fast inner loop:
