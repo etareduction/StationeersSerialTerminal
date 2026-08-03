@@ -55,7 +55,7 @@ consume:
     move cmd ch
     j readline
 
-rubout:                      # the terminal already erased the glass
+rubout:                      # the terminal already erased it on screen
     blez len readline
     sub len len 1
     bgtz len readline

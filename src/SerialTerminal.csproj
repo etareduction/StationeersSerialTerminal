@@ -12,8 +12,7 @@
     <OutputPath>$(MSBuildProjectDirectory)/../mod/</OutputPath>
     <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
     <DebugType>none</DebugType>
-    <!-- Game and BepInEx assemblies are not redistributable, so lib/ is gitignored
-         symlinks into the local install. Run ./setup.sh to populate it. -->
+    <!-- Run ./setup.sh to populate it. -->
     <LibPath>$(MSBuildProjectDirectory)/../lib</LibPath>
   </PropertyGroup>
 

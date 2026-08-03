@@ -1,10 +1,11 @@
 # Serial Terminal
 
 A Stationeers mod adding the Norsec TTY-6 Serial Terminal: a free-standing
-computer block — monitor, desk unit and keyboard — that is secretly just a glass
-teletype. No processor, no storage; IC10 circuits print to it and read typed
-input from it through a six-register memory-mapped UART. Click the screen to
-type, and every keystroke goes straight to the wire.
+computer block — monitor, desk unit and keyboard — with no processor and no
+storage. It is a character display and keyboard wired to a six-register
+memory-mapped UART: IC10 circuits print to it and read typed input from it
+with `get`/`put`. Click the screen to type; each keystroke is delivered
+directly to the input buffer.
 
 - [`mod/API.md`](mod/API.md) — the device's register-level API reference
 - [`DESIGN.md`](DESIGN.md) — how the mod is built and why
@@ -45,8 +46,8 @@ directory as `SerialTerminal`:
 - Linux/Proton — `<proton-prefix>/drive_c/users/steamuser/Documents/My Games/Stationeers/mods/`
 
 Enable it from StationeersLaunchPad's in-game mod list. LaunchPad loads mods
-once at startup, so a rebuild needs a full game restart — and building over a
-DLL the running game has mapped will not end well, so build between sessions.
+once at startup, so a rebuild needs a full game restart — and overwriting a
+DLL the running game has mapped can crash it, so build between sessions.
 
 Recipe/language XML only merges for mods in that folder; a bare DLL in
 `BepInEx/plugins` loads code but gets no recipes or localization.
