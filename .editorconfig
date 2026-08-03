@@ -116,7 +116,7 @@ csharp_prefer_static_local_function = true:warning
 csharp_preferred_modifier_order = public,private,protected,internal,const,static,extern,new,virtual,abstract,sealed,override,readonly,unsafe,volatile,async:warning
 
 # Code-block preferences
-csharp_prefer_braces = true:silent
+csharp_prefer_braces = when_multiline:silent
 csharp_prefer_simple_using_statement = true:warning
 # C# 9 project: file-scoped namespaces are a C# 10 feature.
 csharp_style_namespace_declarations = block_scoped:warning
@@ -344,6 +344,26 @@ dotnet_diagnostic.IDE0130.severity = warning   # namespace must match folder str
 dotnet_diagnostic.IDE0150.severity = warning   # null check over type check
 dotnet_diagnostic.IDE0160.severity = warning   # block-scoped namespace
 dotnet_diagnostic.IDE1005.severity = warning   # conditional delegate call
+dotnet_diagnostic.IDE0046.severity = warning   # convert to conditional expression
+dotnet_diagnostic.IDE0048.severity = warning   # add parentheses for clarity
+dotnet_diagnostic.IDE0058.severity = warning   # expression value is never used
+dotnet_diagnostic.IDE0078.severity = warning   # use pattern matching
+dotnet_diagnostic.RCS1031.severity = warning   # unnecessary braces in switch section
+dotnet_diagnostic.RCS1141.severity = warning   # add 'param' to documentation comment
+dotnet_diagnostic.RCS1181.severity = warning   # convert comment to documentation comment
+dotnet_diagnostic.RCS1189.severity = warning   # add or remove region name
+
+# Braces are required only where the body spans lines (csharp_prefer_braces =
+# when_multiline above): single-line guard clauses stay as they are, while the
+# multi-line-body-without-braces shape - where appending a statement silently
+# leaves it outside the branch - becomes a build error.
+dotnet_diagnostic.IDE0011.severity = warning   # add braces
+
+# The switch statements here dispatch on int command codes, char and the game's
+# LogicType; exhaustiveness is neither possible nor meaningful for any of them,
+# so the three sites carry SuppressMessage with the reason. Enabled so a switch
+# over an enum we do own has to opt out deliberately.
+dotnet_diagnostic.IDE0010.severity = warning   # add missing cases
 
 # Public instance fields are required by Unity serialization, the game's XML
 # save serializer and the network message layer - properties break all three.
@@ -396,9 +416,11 @@ dotnet_diagnostic.MA0075.severity = none       # implicit culture-sensitive ToSt
 dotnet_diagnostic.MA0076.severity = none       # ... in interpolated strings
 
 # Bit-packing and flag composition on game/ImGui enums we don't declare;
-# [Flags] is missing on their side, and the precedence-heavy packed-ascii
-# expressions are deliberate.
+# [Flags] is missing on their side.
 dotnet_diagnostic.RCS1130.severity = none      # bitwise operation on enum without Flags
+
+# Parenthesization is gated by IDE0048 (always_for_clarity, above); this is the
+# same check from the other analyzer host, and one report per site is enough.
 dotnet_diagnostic.RCS1123.severity = none      # add parentheses when necessary
 
 # SetActive(false) and friends are Unity idioms; naming those bools is noise.

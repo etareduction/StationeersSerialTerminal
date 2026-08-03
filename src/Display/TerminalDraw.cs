@@ -13,8 +13,10 @@ namespace SerialTerminal.Display
         public static readonly uint WindowBackground = Color32ToImGui(new Color32(16, 16, 16, 255));
         public static readonly uint ScreenBackground = Color32ToImGui(new Color32(2, 8, 2, 255));
 
-        // Phosphor green (#33FF33) with a translucent block cursor.
+        /// <summary>Phosphor green (#33FF33).</summary>
         public static readonly uint TextColor = Color32ToImGui(new Color32(51, 255, 51, 255));
+
+        /// <summary>Translucent block cursor over the phosphor green.</summary>
         public static readonly uint CursorColor = (TextColor & 0x00FFFFFFu) | 0xA0000000u;
 
         public static ImFontPtr PickFont(ImGuiIOPtr io)
@@ -26,6 +28,7 @@ namespace SerialTerminal.Display
         /// Draws the terminal cell grid plus block cursor at the current cursor
         /// position of the current ImGui window. Caller pushes the font.
         /// </summary>
+        /// <param name="device">The terminal whose cells are drawn.</param>
         public static void DrawBuffer(SerialTerminalDevice device)
         {
             string[] lines = device.SnapshotLines(out int cursorRow, out int cursorCol);
@@ -43,7 +46,7 @@ namespace SerialTerminal.Display
             ImGui.PopStyleColor();
             ImGui.PopStyleVar();
 
-            Vector2 cursorMin = new(origin.x + cursorCol * charW, origin.y + cursorRow * lineH);
+            Vector2 cursorMin = new(origin.x + (cursorCol * charW), origin.y + (cursorRow * lineH));
             drawList.AddRectFilled(cursorMin, cursorMin + new Vector2(charW, lineH), CursorColor);
         }
 

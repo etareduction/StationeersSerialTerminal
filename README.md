@@ -57,8 +57,8 @@ fast inner loop:
 
     dotnet build -p:SkipVerify=true
 
-An advisory sweep lists hidden-severity findings (add braces, explicit type,
-comment-to-doc-comment...):
+An advisory sweep lists hidden-severity findings (explicit type, block body for
+method, nested `?:`...):
 
     dotnet build -t:VerifyDeep
 

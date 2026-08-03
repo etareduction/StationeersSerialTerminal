@@ -28,13 +28,27 @@ namespace SerialTerminal.Devices
     /// </summary>
     public class SerialTerminalDevice : LogicDisplay, IMemoryReadable, IMemoryWritable
     {
-        // UART register map (see DESIGN.md)
-        private const int ADDR_DATA = 0;   // r: pop input (char, or packed ascii-6 in buffered mode) / w: print (same)
-        private const int ADDR_STR = 1;    // r: peek input char / w: print packed ascii-6
-        private const int ADDR_COUNT = 2;  // r: input chars available
-        private const int ADDR_CTRL = 3;   // r: status flags / w: command
-        private const int ADDR_ROW = 4;    // rw: cursor row (clamped)
-        private const int ADDR_COL = 5;    // rw: cursor column (clamped)
+        /// <summary>
+        /// UART register map (see DESIGN.md).
+        /// r: pop input (char, or packed ascii-6 in buffered mode) / w: print (same).
+        /// </summary>
+        private const int ADDR_DATA = 0;
+
+        /// <summary>r: peek input char / w: print packed ascii-6.</summary>
+        private const int ADDR_STR = 1;
+
+        /// <summary>r: input chars available.</summary>
+        private const int ADDR_COUNT = 2;
+
+        /// <summary>r: status flags / w: command.</summary>
+        private const int ADDR_CTRL = 3;
+
+        /// <summary>rw: cursor row (clamped).</summary>
+        private const int ADDR_ROW = 4;
+
+        /// <summary>rw: cursor column (clamped).</summary>
+        private const int ADDR_COL = 5;
+
         private const int REGISTER_COUNT = 6;
 
         private const int CTRL_CLEAR_SCREEN = 1;
@@ -47,26 +61,44 @@ namespace SerialTerminal.Devices
         private const int CTRL_ECHO_OFF = 8;
         private const int CTRL_ECHO_ON = 9;
 
-        // Control characters honoured on output.
-        private const char CH_BS = '\b';     // 8: cursor left, stops at column 0
-        private const char CH_LF = '\n';     // 10: down one row, column unchanged
-        private const char CH_FF = '\f';     // 12: clear screen, cursor home
-        private const char CH_CR = '\r';     // 13: cursor to column 0
-        private const char CH_DEL = '\u007f'; // 127: destructive backspace (BS SP BS)
-        private const char CH_NEL = '\u0085'; // 133: next line (CR + LF)
+        /// <summary>
+        /// Control characters honoured on output.
+        /// 8: cursor left, stops at column 0.
+        /// </summary>
+        private const char CH_BS = '\b';
 
-        // Max chars per packed ascii-6 double (IC10 STR convention).
+        /// <summary>10: down one row, column unchanged.</summary>
+        private const char CH_LF = '\n';
+
+        /// <summary>12: clear screen, cursor home.</summary>
+        private const char CH_FF = '\f';
+
+        /// <summary>13: cursor to column 0.</summary>
+        private const char CH_CR = '\r';
+
+        /// <summary>127: destructive backspace (BS SP BS).</summary>
+        private const char CH_DEL = '\u007f';
+
+        /// <summary>133: next line (CR + LF).</summary>
+        private const char CH_NEL = '\u0085';
+
+        /// <summary>Max chars per packed ascii-6 double (IC10 STR convention).</summary>
         private const int PackedChars = 6;
 
         public const int Rows = 20;
         public const int Columns = 40;
         public const int RxCapacity = 256;
 
-        // Class-specific NetworkUpdateFlags bits. Vanilla puts per-class payloads at
-        // 1024+ (see NetworkUpdateType.Thing.*); below us the chain occupies
-        // 8/16/32/128 (Thing), 64 (Structure) and 256 (LogicUnitBase).
-        private const ushort ScreenNetworkFlag = 1024;  // cells + cursor
-        private const ushort StatusNetworkFlag = 2048;  // rx count + overflow
+        /// <summary>
+        /// Class-specific NetworkUpdateFlags bit for the screen payload (cells +
+        /// cursor). Vanilla puts per-class payloads at 1024+ (see
+        /// NetworkUpdateType.Thing.*); below us the chain occupies 8/16/32/128
+        /// (Thing), 64 (Structure) and 256 (LogicUnitBase).
+        /// </summary>
+        private const ushort ScreenNetworkFlag = 1024;
+
+        /// <summary>Class-specific NetworkUpdateFlags bit for rx count + overflow.</summary>
+        private const ushort StatusNetworkFlag = 2048;
 
         private readonly object _stateLock = new();
         private readonly Queue<char> _rx = new();
@@ -74,22 +106,41 @@ namespace SerialTerminal.Devices
         private int _cursorRow;
         private int _cursorCol;
         private bool _overflow;
-        // Transfer modes for the DATA register: unbuffered = one char per get/put,
-        // buffered = one packed ascii-6 string (up to 6 chars) per get/put.
+
+        /// <summary>
+        /// Transfer mode for writes to the DATA register: unbuffered = one char per
+        /// put, buffered = one packed ascii-6 string (up to 6 chars) per put.
+        /// </summary>
         private bool _outputBuffered;
+
+        /// <summary>
+        /// Transfer mode for reads from the DATA register: unbuffered = one char per
+        /// get, buffered = one packed ascii-6 string (up to 6 chars) per get.
+        /// </summary>
         private bool _inputBuffered;
-        // Half-duplex switch: the keyboard controller echoes keystrokes device-side,
-        // without waiting for the circuit.
+
+        /// <summary>
+        /// Half-duplex switch: the keyboard controller echoes keystrokes device-side,
+        /// without waiting for the circuit.
+        /// </summary>
         private bool _localEcho;
-        // Previous operating state; its falling edge (switched off or power lost)
-        // wipes all state.
+
+        /// <summary>
+        /// Previous operating state; its falling edge (switched off or power lost)
+        /// wipes all state.
+        /// </summary>
         private bool _wasOperating;
-        // Input queue count as last synced from the server. _rx itself only lives
-        // where the simulation runs; remote clients need this for tooltips/logic reads.
+
+        /// <summary>
+        /// Input queue count as last synced from the server. _rx itself only lives
+        /// where the simulation runs; remote clients need this for tooltips/logic reads.
+        /// </summary>
         private int _syncedRxCount;
 
-        // Incremented on every visible state change; the ImGui window and the
-        // in-world screen renderer poll it to know when to repaint.
+        /// <summary>
+        /// Incremented on every visible state change; the ImGui window and the
+        /// in-world screen renderer poll it to know when to repaint.
+        /// </summary>
         private int _version;
         private string[] _lineCache;
         private int _lineCacheVersion = -1;
@@ -124,19 +175,20 @@ namespace SerialTerminal.Devices
         /// (SetDisplay still needs a non-null DigitTransform - PrefabFactory
         /// guarantees one.)
         /// </summary>
+        /// <param name="densePool">The renderer pool asking to add this display.</param>
+        /// <param name="slot">The pool slot offered to this display.</param>
         public override bool OnAddToPool(object densePool, int slot)
         {
-            if (ReferenceEquals(densePool, LogicDisplayDigitRenderer.ActiveDisplays))
-            {
-                return false;
-            }
-            return base.OnAddToPool(densePool, slot);
+            return !ReferenceEquals(densePool, LogicDisplayDigitRenderer.ActiveDisplays)
+                && base.OnAddToPool(densePool, slot);
         }
 
         /// <summary>
         /// Main-thread snapshot of the screen for drawing. Rebuilt only when the
         /// version changed since the last call.
         /// </summary>
+        /// <param name="cursorRow">Cursor row at snapshot time.</param>
+        /// <param name="cursorCol">Cursor column at snapshot time.</param>
         public string[] SnapshotLines(out int cursorRow, out int cursorCol)
         {
             int version = _version;
@@ -174,7 +226,6 @@ namespace SerialTerminal.Devices
                 switch (address)
                 {
                     case ADDR_DATA:
-                    {
                         if (_rx.Count == 0) return 0;
                         double result;
                         if (_inputBuffered)
@@ -195,7 +246,6 @@ namespace SerialTerminal.Devices
                         // Only the FIFO count changed, not the screen.
                         MarkStatusDirty();
                         return result;
-                    }
                     case ADDR_STR:
                         return _rx.Count > 0 ? _rx.Peek() : 0;
                     case ADDR_COUNT:
@@ -216,14 +266,26 @@ namespace SerialTerminal.Devices
             }
         }
 
-        // The game's own IC10 interpreter throws System.StackOverflowException for a
-        // bad `put` and converts it to the StackOverFlow chip error by type check
-        // (ProgrammableChip.WriteMemory does the same); a custom type would surface
-        // as Unknown instead.
+        /// <summary>
+        /// Writes one UART register (IC10 <c>put</c>).
+        /// </summary>
+        /// <remarks>
+        /// The game's own IC10 interpreter throws System.StackOverflowException for a
+        /// bad `put` and converts it to the StackOverFlow chip error by type check
+        /// (ProgrammableChip.WriteMemory does the same); a custom type would surface
+        /// as Unknown instead.
+        /// </remarks>
+        /// <param name="address">Register address; out-of-range raises the chip error.</param>
+        /// <param name="value">Value written by the chip.</param>
+        /// <exception cref="StackOverflowException">
+        /// The address is not a writable register.
+        /// </exception>
         [SuppressMessage("Usage", "CA2201:Do not raise reserved exception types",
             Justification = "Matches the game's IC10 error convention")]
         [SuppressMessage("Design", "MA0012:Do not raise reserved exception type",
             Justification = "Matches the game's IC10 error convention")]
+        [SuppressMessage("Style", "IDE0010:Add missing cases",
+            Justification = "The CTRL sub-switch dispatches int command codes, not an enum; unknown codes are ignored by design (only a bad register address raises the chip error)")]
         public void WriteMemory(int address, double value)
         {
             bool screenChanged = true;
@@ -233,16 +295,14 @@ namespace SerialTerminal.Devices
                 switch (address)
                 {
                     case ADDR_DATA:
-                    {
                         if (_outputBuffered)
                         {
                             PutPacked(value);
                             break;
                         }
                         int code = (int)value;
-                        if (code > 0 && code < 256) PutChar((char)code);
+                        if (code is > 0 and < 256) PutChar((char)code);
                         break;
-                    }
                     case ADDR_STR:
                         PutPacked(value);
                         break;
@@ -292,11 +352,12 @@ namespace SerialTerminal.Devices
             MarkStatusDirty();
         }
 
-        #endregion
+        #endregion IMemory (IC10 get/put)
 
         #region Terminal emulation (callers must hold _stateLock)
 
         /// <summary>Print one packed ascii-6 double (IC10 STR convention).</summary>
+        /// <param name="value">Packed ascii-6 double as written by the chip.</param>
         private void PutPacked(double value)
         {
             PutString(ProgrammableChip.UnpackAscii6(value, signed: true));
@@ -308,6 +369,8 @@ namespace SerialTerminal.Devices
             foreach (char c in text) PutChar(c);
         }
 
+        [SuppressMessage("Style", "IDE0010:Add missing cases",
+            Justification = "Switches over char to honour the handful of control characters listed above; everything else falls through to the printable path below")]
         private void PutChar(char c)
         {
             switch (c)
@@ -329,7 +392,7 @@ namespace SerialTerminal.Devices
                     if (_cursorCol > 0)
                     {
                         _cursorCol--;
-                        _cells[_cursorRow * Columns + _cursorCol] = ' ';
+                        _cells[(_cursorRow * Columns) + _cursorCol] = ' ';
                     }
                     return;
                 case CH_FF:
@@ -337,7 +400,7 @@ namespace SerialTerminal.Devices
                     return;
             }
             if (c < ' ') return;
-            _cells[_cursorRow * Columns + _cursorCol] = c;
+            _cells[(_cursorRow * Columns) + _cursorCol] = c;
             _cursorCol++;
             if (_cursorCol >= Columns)
             {
@@ -353,7 +416,7 @@ namespace SerialTerminal.Devices
             if (_cursorRow < Rows) return;
             _cursorRow = Rows - 1;
             Array.Copy(_cells, Columns, _cells, 0, (Rows - 1) * Columns);
-            for (int c = 0; c < Columns; c++) _cells[(Rows - 1) * Columns + c] = ' ';
+            for (int c = 0; c < Columns; c++) _cells[((Rows - 1) * Columns) + c] = ' ';
         }
 
         private void ClearScreen()
@@ -363,17 +426,17 @@ namespace SerialTerminal.Devices
             _cursorCol = 0;
         }
 
-        #endregion
+        #endregion Terminal emulation (callers must hold _stateLock)
 
         /// <summary>
         /// No NVRAM: losing power or being switched off wipes the whole terminal
         /// (screen, FIFO, flags, modes) — a power cycle is a full reset.
         /// </summary>
+        /// <param name="interactable">The interactable whose state changed.</param>
         public override void OnInteractableUpdated(Interactable interactable)
         {
             base.OnInteractableUpdated(interactable);
-            if (interactable.Action != InteractableType.OnOff
-                && interactable.Action != InteractableType.Powered)
+            if (interactable.Action is not (InteractableType.OnOff or InteractableType.Powered))
             {
                 return;
             }
@@ -420,9 +483,12 @@ namespace SerialTerminal.Devices
             return base.InteractWith(interactable, interaction, doAction);
         }
 
-        // NoInlining keeps TerminalWindow (whose ImGui base class the dedicated
-        // server cannot load) out of InteractWith's JIT: InteractWith runs on the
-        // server for every interaction, this helper only for the local player.
+        /// <summary>
+        /// NoInlining keeps TerminalWindow (whose ImGui base class the dedicated
+        /// server cannot load) out of InteractWith's JIT: InteractWith runs on the
+        /// server for every interaction, this helper only for the local player.
+        /// </summary>
+        /// <param name="device">The terminal to show a window for.</param>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static void OpenTerminalWindow(SerialTerminalDevice device)
         {
@@ -431,14 +497,13 @@ namespace SerialTerminal.Devices
 
         public override string GetContextualName(Interactable interactable)
         {
-            if (interactable.Action == InteractableType.Activate)
-            {
-                return "Open Terminal";
-            }
-            return base.GetContextualName(interactable);
+            return interactable.Action == InteractableType.Activate
+                ? "Open Terminal"
+                : base.GetContextualName(interactable);
         }
 
         /// <summary>Local player pressed keys in the terminal window (raw, unbuffered).</summary>
+        /// <param name="text">Raw keystrokes typed this frame.</param>
         public void SubmitInput(string text)
         {
             if (string.IsNullOrEmpty(text)) return;
@@ -448,7 +513,7 @@ namespace SerialTerminal.Devices
             }
             else
             {
-                new TerminalInputMessage
+                _ = new TerminalInputMessage
                 {
                     TerminalId = ReferenceId,
                     Text = text
@@ -457,6 +522,7 @@ namespace SerialTerminal.Devices
         }
 
         /// <summary>Server side: queue raw keystrokes into the input FIFO.</summary>
+        /// <param name="text">Raw keystrokes from the client.</param>
         public void EnqueueInput(string text)
         {
             bool echoed;
@@ -484,6 +550,7 @@ namespace SerialTerminal.Devices
         /// Local-echo rendering of one keystroke (caller must hold _stateLock):
         /// Enter (CR) echoes as a full newline, Backspace (BS) as a rubout.
         /// </summary>
+        /// <param name="c">The keystroke to echo.</param>
         private void EchoChar(char c)
         {
             switch (c)
@@ -496,19 +563,18 @@ namespace SerialTerminal.Devices
             }
         }
 
-        #endregion
+        #endregion Player input
 
         #region Logic types
 
         public override bool CanLogicRead(LogicType logicType)
         {
-            if (logicType == LogicType.Quantity || logicType == LogicType.Error)
-            {
-                return true;
-            }
-            return base.CanLogicRead(logicType);
+            return logicType is LogicType.Quantity or LogicType.Error
+                || base.CanLogicRead(logicType);
         }
 
+        [SuppressMessage("Style", "IDE0010:Add missing cases",
+            Justification = "LogicType is the game's enum of every logic channel there is; the two this device answers are listed and the rest defer to the base implementation")]
         public override double GetLogicValue(LogicType logicType)
         {
             switch (logicType)
@@ -535,7 +601,7 @@ namespace SerialTerminal.Devices
             }
         }
 
-        #endregion
+        #endregion Logic types
 
         #region Dirty flags
 
@@ -545,7 +611,7 @@ namespace SerialTerminal.Devices
             {
                 NetworkUpdateFlags |= ScreenNetworkFlag;
             }
-            Interlocked.Increment(ref _version);
+            _ = Interlocked.Increment(ref _version);
         }
 
         /// <summary>FIFO count / overflow changed but the screen did not.</summary>
@@ -557,7 +623,7 @@ namespace SerialTerminal.Devices
             }
         }
 
-        #endregion
+        #endregion Dirty flags
 
         #region Network sync
 
@@ -622,7 +688,7 @@ namespace SerialTerminal.Devices
                 _cursorRow = Mathf.Clamp(row, 0, Rows - 1);
                 _cursorCol = Mathf.Clamp(col, 0, Columns - 1);
             }
-            Interlocked.Increment(ref _version);
+            _ = Interlocked.Increment(ref _version);
         }
 
         private void WriteStatusState(RocketBinaryWriter writer)
@@ -645,7 +711,7 @@ namespace SerialTerminal.Devices
             }
         }
 
-        #endregion
+        #endregion Network sync
 
         #region Save data
 
@@ -701,23 +767,34 @@ namespace SerialTerminal.Devices
                 // Interactable states (OnOff/Powered) are restored by the base
                 // deserialize, so this reflects the state at save time.
                 _wasOperating = OnOff && Powered;
-                Interlocked.Increment(ref _version);
+                _ = Interlocked.Increment(ref _version);
             }
         }
 
-        #endregion
+        #endregion Save data
 
-        // Control characters are not valid in XML 1.0, so the saved input FIFO
-        // escapes them as \xNN (plus \\ for a literal backslash). Legacy saves
-        // used \n for newlines; UnescapeBuffer still accepts that.
+        /// <summary>
+        /// Control characters are not valid in XML 1.0, so the saved input FIFO
+        /// escapes them as \xNN (plus \\ for a literal backslash). Legacy saves
+        /// used \n for newlines; UnescapeBuffer still accepts that.
+        /// </summary>
+        /// <param name="text">Raw FIFO contents.</param>
         private static string EscapeBuffer(string text)
         {
             StringBuilder sb = new(text.Length);
             foreach (char c in text)
             {
-                if (c == '\\') sb.Append("\\\\");
-                else if (c < ' ' || c == CH_DEL) sb.Append("\\x").Append(((int)c).ToString("x2", CultureInfo.InvariantCulture));
-                else sb.Append(c);
+                if (c == '\\')
+                {
+                    _ = sb.Append("\\\\");
+                    continue;
+                }
+                if (c is < ' ' or CH_DEL)
+                {
+                    _ = sb.Append("\\x").Append(((int)c).ToString("x2", CultureInfo.InvariantCulture));
+                    continue;
+                }
+                _ = sb.Append(c);
             }
             return sb.ToString();
         }
@@ -730,24 +807,24 @@ namespace SerialTerminal.Devices
                 char c = text[i];
                 if (c != '\\' || i == text.Length - 1)
                 {
-                    sb.Append(c);
+                    _ = sb.Append(c);
                     continue;
                 }
                 char next = text[++i];
                 switch (next)
                 {
-                    case '\\': sb.Append('\\'); break;
-                    case 'n': sb.Append('\n'); break;
+                    case '\\': _ = sb.Append('\\'); break;
+                    case 'n': _ = sb.Append('\n'); break;
                     case 'x':
                         if (i + 2 < text.Length
                             && int.TryParse(text.Substring(i + 1, 2),
                                 NumberStyles.HexNumber, CultureInfo.InvariantCulture, out int code))
                         {
-                            sb.Append((char)code);
+                            _ = sb.Append((char)code);
                             i += 2;
                         }
                         break;
-                    default: sb.Append(next); break;
+                    default: _ = sb.Append(next); break;
                 }
             }
             return sb.ToString();
@@ -761,9 +838,9 @@ namespace SerialTerminal.Devices
             for (int r = 0; r < Rows; r++)
             {
                 int end = Columns;
-                while (end > 0 && _cells[r * Columns + end - 1] == ' ') end--;
-                sb.Append(_cells, r * Columns, end);
-                if (r < Rows - 1) sb.Append('\n');
+                while (end > 0 && _cells[(r * Columns) + end - 1] == ' ') end--;
+                _ = sb.Append(_cells, r * Columns, end);
+                if (r < Rows - 1) _ = sb.Append('\n');
             }
             return sb.ToString();
         }
@@ -778,12 +855,12 @@ namespace SerialTerminal.Devices
                 string line = lines[r];
                 for (int c = 0; c < Columns && c < line.Length; c++)
                 {
-                    _cells[r * Columns + c] = line[c];
+                    _cells[(r * Columns) + c] = line[c];
                 }
             }
         }
 
-        #endregion
+        #endregion Screen <-> string (callers must hold _stateLock)
 
         public override StringBuilder GetExtendedText()
         {
@@ -795,10 +872,10 @@ namespace SerialTerminal.Devices
                 rxCount = GameManager.RunSimulation ? _rx.Count : _syncedRxCount;
                 overflow = _overflow;
             }
-            sb.Append("Input Buffer ").AppendLine((rxCount + "/" + RxCapacity).AsColor("yellow"));
+            _ = sb.Append("Input Buffer ").AppendLine((rxCount + "/" + RxCapacity).AsColor("yellow"));
             if (overflow)
             {
-                sb.AppendLine("Input Overflow".AsColor("red"));
+                _ = sb.AppendLine("Input Overflow".AsColor("red"));
             }
             return sb;
         }

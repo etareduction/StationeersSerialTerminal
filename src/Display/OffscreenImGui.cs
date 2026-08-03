@@ -95,6 +95,10 @@ namespace SerialTerminal.Display
         /// Runs one ImGui frame in the offscreen context and renders it into the
         /// given RenderTexture immediately.
         /// </summary>
+        /// <param name="target">RenderTexture the frame is drawn into.</param>
+        /// <param name="renderer">Per-screen mesh renderer from CreateRenderer.</param>
+        /// <param name="commandBuffer">Command buffer reused for the blit.</param>
+        /// <param name="device">The terminal whose cells are drawn.</param>
         public static bool Render(RenderTexture target, ImGuiRendererMesh renderer,
             CommandBuffer commandBuffer, SerialTerminalDevice device)
         {
@@ -124,7 +128,7 @@ namespace SerialTerminal.Display
                 ImGui.SetNextWindowPos(Vector2.zero);
                 ImGui.SetNextWindowSize(io.DisplaySize);
                 ImGui.PushStyleColor(ImGuiCol.WindowBg, TerminalDraw.ScreenBackground);
-                ImGui.Begin("##screen",
+                _ = ImGui.Begin("##screen",
                     ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoResize
                     | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoScrollbar
                     | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoCollapse

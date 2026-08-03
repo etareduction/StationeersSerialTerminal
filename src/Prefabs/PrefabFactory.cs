@@ -24,7 +24,7 @@ namespace SerialTerminal.Prefabs
         public const string KitPrefabName = "ItemKitSerialTerminal";
         public const string SourceKitName = "ItemKitComputer";
 
-        // Tried in order. StructureComputer = "Computer (Modern)".
+        /// <summary>Tried in order. StructureComputer = "Computer (Modern)".</summary>
         private static readonly string[] SourcePrefabFallbacks =
         {
             "StructureComputer",
@@ -138,7 +138,7 @@ namespace SerialTerminal.Prefabs
             UnityEngine.Object.DestroyImmediate(old);
 
             // The TTY-6 has no motherboard: keep the access door permanently shut.
-            device.Interactables.RemoveAll(i => i.Action == InteractableType.Open);
+            _ = device.Interactables.RemoveAll(i => i.Action == InteractableType.Open);
 
             EnsureActivateInteractable(device, CreateScreenCollider(device, screen));
             CloneExternalBlueprint(device, go);
@@ -151,6 +151,8 @@ namespace SerialTerminal.Prefabs
         /// render-texture quad goes. The canvas itself must never activate (nothing
         /// drives it once the Computer component is gone).
         /// </summary>
+        /// <param name="old">The source prefab's Thing component, before it is destroyed.</param>
+        /// <param name="screen">The behaviour that stores the captured pose.</param>
         private static void CaptureScreenAnchor(Thing old, TerminalScreenBehaviour screen)
         {
             if (old is not Computer computer || computer.ComputerScreen == null)
@@ -175,6 +177,8 @@ namespace SerialTerminal.Prefabs
         /// (ConnectionType, OpenEndsPermutation); the shared-chain field copy misses
         /// them, and placement rotation goes wrong without the source's values.
         /// </summary>
+        /// <param name="old">The source prefab's Thing component.</param>
+        /// <param name="device">The replacement device receiving the values.</param>
         private static void CopySmartRotation(Thing old, SerialTerminalDevice device)
         {
             if (old is Computer computer)
@@ -197,6 +201,8 @@ namespace SerialTerminal.Prefabs
         /// the digit renderer's pool in OnAddToPool), but clones of non-LogicDisplay
         /// sources (Computer) leave the field null, so give it a throwaway anchor.
         /// </summary>
+        /// <param name="device">The device whose DigitTransform must be non-null.</param>
+        /// <param name="go">The prefab root the anchor is parented to.</param>
         private static void EnsureDigitTransform(SerialTerminalDevice device, GameObject go)
         {
             if (device.DigitTransform != null)
@@ -232,6 +238,8 @@ namespace SerialTerminal.Prefabs
         /// shared chain (e.g. Computer when replacing with a LogicDisplay subclass) are
         /// skipped - their fields don't exist on the replacement.
         /// </summary>
+        /// <param name="from">The component to copy field values from.</param>
+        /// <param name="to">The component to copy field values to.</param>
         private static void CopyFields(Component from, Component to)
         {
             for (Type type = from.GetType(); type != null && type != typeof(MonoBehaviour); type = type.BaseType)
@@ -262,6 +270,9 @@ namespace SerialTerminal.Prefabs
         /// instance built from the prefab - which the game then dereferences blind
         /// (ConnectionRef..ctor, GameAudioEvent.IsValid, ...).
         /// </summary>
+        /// <param name="go">Root of the prefab hierarchy to sweep.</param>
+        /// <param name="old">The component about to be destroyed.</param>
+        /// <param name="replacement">The component references are repointed at.</param>
         private static void RedirectReferences(GameObject go, Component old, Component replacement)
         {
             HashSet<object> visited = new(ReferenceComparer.Instance);
@@ -338,24 +349,23 @@ namespace SerialTerminal.Prefabs
         /// objects are reached through the hierarchy sweep (or are not ours to rewrite),
         /// and structs would only be updated on a boxed copy.
         /// </summary>
+        /// <param name="value">The field or element value the sweep just read.</param>
         private static bool ShouldRecurseInto(object value)
         {
-            if (value == null || value is UnityEngine.Object || value is string)
+            if (value is null or UnityEngine.Object or string)
             {
                 return false;
             }
             Type type = value.GetType();
-            if (type.IsValueType)
-            {
-                return false;
-            }
-            return value is IList || type.Assembly == typeof(Thing).Assembly;
+            return !type.IsValueType
+                && (value is IList || type.Assembly == typeof(Thing).Assembly);
         }
 
         /// <summary>
         /// Every sub-object that carries an owner back-reference points at the terminal,
         /// including any the vanilla prefab left unset.
         /// </summary>
+        /// <param name="device">The terminal every sub-object should point at.</param>
         private static void AdoptSubObjects(SerialTerminalDevice device)
         {
             foreach (Connection connection in device.OpenEnds)
@@ -390,6 +400,8 @@ namespace SerialTerminal.Prefabs
         /// (on the Computer prefab that was the root collider, which the door/slot/button
         /// triggers all occlude).
         /// </summary>
+        /// <param name="device">The terminal the collider is built for.</param>
+        /// <param name="screen">Captured screen pose and size.</param>
         private static BoxCollider CreateScreenCollider(SerialTerminalDevice device, TerminalScreenBehaviour screen)
         {
             Transform anchor = screen.ScreenAnchor;
@@ -421,6 +433,8 @@ namespace SerialTerminal.Prefabs
         /// click the terminal and type. Prefers the dedicated screen collider; falls
         /// back to the largest collider no other interactable uses.
         /// </summary>
+        /// <param name="device">The terminal to add the interaction to.</param>
+        /// <param name="preferred">The dedicated screen collider, or null.</param>
         [SuppressMessage("Style", "IDE0029:Null check can be simplified",
             Justification = "?? on UnityEngine.Object bypasses the lifetime-aware == operator; a destroyed collider must fall through to the search")]
         private static void EnsureActivateInteractable(SerialTerminalDevice device, Collider preferred)
@@ -450,7 +464,7 @@ namespace SerialTerminal.Prefabs
             {
                 if (interactable.Collider != null)
                 {
-                    used.Add(interactable.Collider);
+                    _ = used.Add(interactable.Collider);
                 }
             }
             Collider best = null;
@@ -462,7 +476,7 @@ namespace SerialTerminal.Prefabs
                     continue;
                 }
                 Vector3 size = collider.bounds.size;
-                float area = size.x * size.y + size.y * size.z + size.x * size.z;
+                float area = (size.x * size.y) + (size.y * size.z) + (size.x * size.z);
                 if (best == null || area > bestArea)
                 {
                     best = collider;
@@ -488,7 +502,7 @@ namespace SerialTerminal.Prefabs
             StringBuilder sb = new("Terminal interactables: ");
             foreach (Interactable interactable in thing.Interactables)
             {
-                sb.Append(interactable.Action).Append(
+                _ = sb.Append(interactable.Action).Append(
                     interactable.Collider != null ? "(" + interactable.Collider.name + ") " : "(no collider) ");
             }
             SerialTerminalPlugin.Log.LogInfo(sb.ToString());

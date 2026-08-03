@@ -51,7 +51,7 @@
           StandardOutputImportance="high"
           ContinueOnError="ErrorAndContinue" />
 
-    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level info --report-not-configurable"
+    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level info --report-not-configurable --exclude &quot;**/obj/**&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)"
           EnvironmentVariables="VerifyRunning=1"
           StandardOutputImportance="high"
@@ -64,11 +64,15 @@
 
         dotnet build -t:VerifyDeep
 
-    Reports hidden-severity findings (add braces, explicit type,
-    comment-to-doc-comment...). Every one of those severities is a deliberate
-    choice in .editorconfig, so this is something to read when reconsidering a
-    style decision, not a list of defects - which is why it does not gate.
+    Reports hidden-severity findings (explicit type, block body for method,
+    nested ?:...). Every one of those severities is a deliberate choice in
+    .editorconfig, so this is something to read when reconsidering a style
+    decision, not a list of defects - which is why it does not gate.
     Default verbosity on purpose: -v minimal collapses it to a bare count.
+
+    The exclude glob keeps generated sources (obj/*.AssemblyInfo.cs) out of the
+    tally: report-not-configurable un-suppresses their unused usings, and a
+    permanent floor of findings nobody can act on makes the count useless.
   -->
   <Target Name="VerifyDeep" DependsOnTargets="Build">
     <Exec Command="dotnet tool restore"
@@ -76,7 +80,7 @@
           EnvironmentVariables="VerifyRunning=1"
           StandardOutputImportance="low" />
 
-    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level hidden --report-not-configurable"
+    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level hidden --report-not-configurable --exclude &quot;**/obj/**&quot;"
           WorkingDirectory="$(MSBuildThisFileDirectory)"
           EnvironmentVariables="VerifyRunning=1"
           StandardOutputImportance="high"

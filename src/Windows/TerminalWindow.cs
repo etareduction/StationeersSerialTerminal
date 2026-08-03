@@ -20,11 +20,13 @@ namespace SerialTerminal.Windows
     /// </summary>
     public sealed class TerminalWindow : UI.ImGuiUi.ImGuiWindows.ImGuiWindow
     {
-        // Window auto-closes when the player walks this far from the terminal (meters).
+        /// <summary>Window auto-closes when the player walks this far from the terminal (meters).</summary>
         private const float CloseDistance = 8f;
 
-        // MouseModeController.Check re-locks the cursor every frame unless a modal
-        // is registered; the window manager only handles mouse-as-pointer mode.
+        /// <summary>
+        /// MouseModeController.Check re-locks the cursor every frame unless a modal
+        /// is registered; the window manager only handles mouse-as-pointer mode.
+        /// </summary>
         private static readonly ImGuiModal Modal = new();
         private static TerminalWindow _current;
 
@@ -92,8 +94,8 @@ namespace SerialTerminal.Windows
             float charW = ImGui.CalcTextSize("M").x;
             float lineH = ImGui.GetTextLineHeight();
             Vector2 screenSize = new(
-                SerialTerminalDevice.Columns * charW + 16f,
-                SerialTerminalDevice.Rows * lineH + 16f);
+                (SerialTerminalDevice.Columns * charW) + 16f,
+                (SerialTerminalDevice.Rows * lineH) + 16f);
 
             if (_justOpened)
             {
@@ -101,7 +103,7 @@ namespace SerialTerminal.Windows
                 Vector2 framePad = ImGui.GetStyle().FramePadding;
                 Vector2 windowSize = new(
                     screenSize.x + 24f,
-                    screenSize.y + lineH + framePad.y * 2f + 64f);
+                    screenSize.y + lineH + (framePad.y * 2f) + 64f);
                 ImGui.SetWindowSize(windowSize);
                 ImGui.SetWindowPos((io.DisplaySize - windowSize) * 0.5f);
                 ImGui.SetWindowFocus();
@@ -110,7 +112,7 @@ namespace SerialTerminal.Windows
             bool powered = device.OnOff && device.Powered;
 
             ImGui.PushStyleColor(ImGuiCol.ChildBg, TerminalDraw.ScreenBackground);
-            ImGui.BeginChild("##terminalscreen", screenSize, border: true,
+            _ = ImGui.BeginChild("##terminalscreen", screenSize, border: true,
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
             if (powered)
             {
@@ -149,6 +151,7 @@ namespace SerialTerminal.Windows
         /// on platform; both are sent as CR (13). Backspace arrives as '\b' (8)
         /// and is sent through unchanged.
         /// </summary>
+        /// <param name="device">The terminal receiving the keystrokes.</param>
         private static void SendKeystrokes(SerialTerminalDevice device)
         {
             string typed = Input.inputString;
@@ -161,12 +164,9 @@ namespace SerialTerminal.Windows
         private static bool OutOfRange(SerialTerminalDevice device)
         {
             var human = InventoryManager.ParentHuman;
-            if (human == null)
-            {
-                return false;
-            }
-            return (device.transform.position - human.transform.position).sqrMagnitude
-                > CloseDistance * CloseDistance;
+            return human != null
+                && (device.transform.position - human.transform.position).sqrMagnitude
+                    > CloseDistance * CloseDistance;
         }
     }
 }

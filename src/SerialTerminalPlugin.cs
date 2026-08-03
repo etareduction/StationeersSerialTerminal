@@ -24,8 +24,10 @@ namespace SerialTerminal
         internal static ManualLogSource Log;
         private static bool _initialized;
 
-        // No public API adds thing localization entries; the dictionary itself is
-        // private, so this one reflection read stays.
+        /// <summary>
+        /// No public API adds thing localization entries; the dictionary itself is
+        /// private, so this one reflection read stays.
+        /// </summary>
         private static readonly AccessTools.FieldRef<Dictionary<int, Localization.LocalizationThingDat>> ThingLocalizedRef =
             AccessTools.StaticFieldRefAccess<Dictionary<int, Localization.LocalizationThingDat>>(
                 AccessTools.Field(typeof(Localization), "ThingLocalized"));

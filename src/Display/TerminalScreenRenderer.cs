@@ -17,8 +17,10 @@ namespace SerialTerminal.Display
         Justification = "Unity component; IDisposable is not part of the MonoBehaviour lifecycle - OnDestroy releases everything")]
     public class TerminalScreenRenderer : MonoBehaviour
     {
-        // One quad geometry for every terminal instance; per-device state is the
-        // RenderTexture/material, not the mesh. Never destroyed.
+        /// <summary>
+        /// One quad geometry for every terminal instance; per-device state is the
+        /// RenderTexture/material, not the mesh. Never destroyed.
+        /// </summary>
         private static Mesh _sharedQuadMesh;
 
         private SerialTerminalDevice _device;
@@ -124,7 +126,13 @@ namespace SerialTerminal.Display
                 name = "SerialTerminalScreen",
                 filterMode = FilterMode.Bilinear
             };
-            _texture.Create();
+            if (!_texture.Create())
+            {
+                SerialTerminalPlugin.Log.LogWarning(
+                    $"Terminal screen: could not create the {texWidth}x{texHeight} render texture");
+                _setupFailed = true;
+                return false;
+            }
             _commandBuffer = new CommandBuffer { name = "SerialTerminalScreen" };
 
             Shader shader = FindScreenShader();
@@ -151,7 +159,7 @@ namespace SerialTerminal.Display
             };
             quad.transform.SetParent(_device.transform, worldPositionStays: false);
             // Nudged off the panel face so the quad doesn't z-fight with the monitor mesh.
-            quad.transform.SetPositionAndRotation(anchor.position + anchor.forward * 0.002f, anchor.rotation);
+            quad.transform.SetPositionAndRotation(anchor.position + (anchor.forward * 0.002f), anchor.rotation);
             quad.transform.localScale = new Vector3(width, height, 1f);
             if (_sharedQuadMesh == null)
             {

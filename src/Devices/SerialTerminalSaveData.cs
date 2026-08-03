@@ -3,7 +3,9 @@ using Assets.Scripts.Objects.Electrical;
 
 namespace SerialTerminal.Devices
 {
-    // Registered with the save serializer via MOD.AddSaveDataType in Plugin.Awake.
+    /// <summary>
+    /// Registered with the save serializer via MOD.AddSaveDataType in Plugin.Awake.
+    /// </summary>
     public class SerialTerminalSaveData : LogicBaseSaveData
     {
         [XmlElement]

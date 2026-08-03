@@ -16,11 +16,17 @@ namespace SerialTerminal.Display
     /// </summary>
     public class TerminalScreenBehaviour : MonoBehaviour
     {
-        // Set at prefab-build time (PrefabFactory): pose + size of the monitor face,
-        // taken from the vanilla Computer's world-space UI canvas. Serialized so
-        // every spawned instance inherits them.
+        /// <summary>
+        /// Set at prefab-build time (PrefabFactory): pose of the monitor face, taken
+        /// from the vanilla Computer's world-space UI canvas. Serialized so every
+        /// spawned instance inherits it.
+        /// </summary>
         public Transform ScreenAnchor;
+
+        /// <summary>Monitor face width in meters, captured with the anchor.</summary>
         public float ScreenWorldWidth;
+
+        /// <summary>Monitor face height in meters, captured with the anchor.</summary>
         public float ScreenWorldHeight;
 
         [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
@@ -34,12 +40,14 @@ namespace SerialTerminal.Display
             enabled = false;
         }
 
-        // NoInlining keeps TerminalScreenRenderer (ImGui-typed fields) out of this
-        // method's JIT: on the server this is never called, so the type never loads.
+        /// <summary>
+        /// NoInlining keeps TerminalScreenRenderer (ImGui-typed fields) out of this
+        /// method's JIT: on the server this is never called, so the type never loads.
+        /// </summary>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private void AttachRenderer()
         {
-            gameObject.AddComponent<TerminalScreenRenderer>();
+            _ = gameObject.AddComponent<TerminalScreenRenderer>();
         }
     }
 }
