@@ -1,8 +1,9 @@
 using Assets.Scripts;
 using Assets.Scripts.Networking;
 using LaunchPadBooster.Networking;
+using SerialTerminal.Devices;
 
-namespace SerialTerminal
+namespace SerialTerminal.Networking
 {
     /// <summary>Client → server: raw keystrokes the player typed into a terminal.</summary>
     public class TerminalInputMessage : ModNetworkMessage<TerminalInputMessage>
@@ -28,7 +29,7 @@ namespace SerialTerminal
             {
                 return;
             }
-            if (Referencable.Exists<SerialTerminalDevice>(TerminalId, out SerialTerminalDevice terminal))
+            if (Referencable.Exists(TerminalId, out SerialTerminalDevice terminal))
             {
                 // Deserialize ran before Process, so Text is never null here.
                 terminal.EnqueueInput(Text);

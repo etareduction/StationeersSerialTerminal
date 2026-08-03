@@ -3,16 +3,16 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
 using Assets.Scripts.Objects;
 using Assets.Scripts.Objects.Electrical;
 using Assets.Scripts.Sound;
 using LaunchPadBooster.Utils;
+using SerialTerminal.Devices;
+using SerialTerminal.Display;
 using UnityEngine;
-using Object = UnityEngine.Object;
 
-namespace SerialTerminal
+namespace SerialTerminal.Prefabs
 {
     /// <summary>
     /// Builds the mod's prefabs at Prefab.LoadAll time by cloning vanilla ones
@@ -67,7 +67,7 @@ namespace SerialTerminal
             {
                 _root = new GameObject("~SerialTerminalMod");
                 _root.SetActive(false);
-                Object.DontDestroyOnLoad(_root);
+                UnityEngine.Object.DontDestroyOnLoad(_root);
 
                 SerialTerminalDevice terminal = CreateTerminal(sourceStructure);
                 MultiConstructor kit = CreateKit(sourceKit, terminal);
@@ -116,7 +116,7 @@ namespace SerialTerminal
 
         private static SerialTerminalDevice CreateTerminal(Structure source)
         {
-            GameObject go = Object.Instantiate(source.gameObject, _root.transform);
+            GameObject go = UnityEngine.Object.Instantiate(source.gameObject, _root.transform);
             go.name = TerminalPrefabName;
 
             Thing old = go.GetComponent<Thing>();
@@ -135,7 +135,7 @@ namespace SerialTerminal
             CopySmartRotation(old, device);
             EnsureDigitTransform(device, go);
 
-            Object.DestroyImmediate(old);
+            UnityEngine.Object.DestroyImmediate(old);
 
             // The TTY-6 has no motherboard: keep the access door permanently shut.
             device.Interactables.RemoveAll(i => i.Action == InteractableType.Open);
@@ -210,7 +210,7 @@ namespace SerialTerminal
 
         private static MultiConstructor CreateKit(MultiConstructor source, Structure constructable)
         {
-            GameObject go = Object.Instantiate(source.gameObject, _root.transform);
+            GameObject go = UnityEngine.Object.Instantiate(source.gameObject, _root.transform);
             go.name = KitPrefabName;
             MultiConstructor kit = go.GetComponent<MultiConstructor>();
             kit.PrefabName = KitPrefabName;
@@ -384,15 +384,6 @@ namespace SerialTerminal
             }
         }
 
-        private sealed class ReferenceComparer : IEqualityComparer<object>
-        {
-            public static readonly ReferenceComparer Instance = new();
-
-            bool IEqualityComparer<object>.Equals(object x, object y) => ReferenceEquals(x, y);
-
-            public int GetHashCode(object obj) => RuntimeHelpers.GetHashCode(obj);
-        }
-
         /// <summary>
         /// A thin trigger box exactly over the monitor face, so the Activate target is
         /// the visible screen instead of whatever collider the fallback heuristic finds
@@ -487,7 +478,7 @@ namespace SerialTerminal
             {
                 return;
             }
-            GameObject blueprint = Object.Instantiate(thing.Blueprint, _root.transform);
+            GameObject blueprint = UnityEngine.Object.Instantiate(thing.Blueprint, _root.transform);
             blueprint.name = thing.PrefabName + "Blueprint";
             thing.Blueprint = blueprint;
         }

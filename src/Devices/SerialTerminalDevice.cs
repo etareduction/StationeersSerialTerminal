@@ -15,9 +15,11 @@ using Assets.Scripts.Objects.Motherboards;
 using Assets.Scripts.Objects.Pipes;
 using Assets.Scripts.Util;
 using Rendering;
+using SerialTerminal.Networking;
+using SerialTerminal.Windows;
 using UnityEngine;
 
-namespace SerialTerminal
+namespace SerialTerminal.Devices
 {
     /// <summary>
     /// Norsec TTY-6 serial terminal: a 6-register memory-mapped UART (IC10 get/put)

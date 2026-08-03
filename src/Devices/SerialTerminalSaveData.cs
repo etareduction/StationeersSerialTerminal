@@ -1,7 +1,7 @@
 using System.Xml.Serialization;
 using Assets.Scripts.Objects.Electrical;
 
-namespace SerialTerminal
+namespace SerialTerminal.Devices
 {
     // Registered with the save serializer via MOD.AddSaveDataType in Plugin.Awake.
     public class SerialTerminalSaveData : LogicBaseSaveData

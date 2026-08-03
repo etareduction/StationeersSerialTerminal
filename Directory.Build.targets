@@ -6,4 +6,82 @@
     <DocumentationFile>$(IntermediateOutputPath)$(AssemblyName).xml</DocumentationFile>
   </PropertyGroup>
 
+  <!--
+    Verification, run after every Build.
+
+    The compiler pass already carries the analyzer packages and the IDE rules
+    configured in .editorconfig. It cannot carry all of them: the
+    simplification analyzers (IDE0001 and friends) need a workspace and never
+    fire from csc - referencing Microsoft.CodeAnalysis.CSharp.CodeStyle
+    explicitly does not change that, the analyzers load and stay silent. Only
+    `dotnet format` reports them, and only out of process. Roslynator is a
+    second analyzer host: it re-runs the packages and adds the
+    NotConfigurable diagnostics neither of the other two surfaces.
+
+    Costs roughly 13s on top of a ~2s build. For a fast inner loop:
+
+        dotnet build -p:SkipVerify=true
+
+    Both tools load the project through MSBuildWorkspace. Should that nested
+    load ever reach the Build target, VerifyRunning (passed as an environment
+    variable, which MSBuild reads as a global property) stops it re-entering
+    this target.
+  -->
+  <Target Name="Verify"
+          AfterTargets="Build"
+          DependsOnTargets="Build"
+          Condition="'$(SkipVerify)' != 'true' AND '$(VerifyRunning)' != '1'">
+
+    <!-- roslynator is a local tool; a fresh clone has not fetched it yet. -->
+    <Exec Command="dotnet tool restore"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          EnvironmentVariables="VerifyRunning=1"
+          StandardOutputImportance="low" />
+
+    <!-- ErrorAndContinue on both: a failing gate still fails the build, but
+         the other one runs, so a single build reports every finding rather
+         than the first tool's worth.
+
+         format emits `file(line,col): error IDEnnnn: ...`, which MSBuild
+         parses as build errors, so findings land in the error list like any
+         other. -->
+    <Exec Command="dotnet format &quot;$(MSBuildProjectFullPath)&quot; --verify-no-changes --severity info --no-restore"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          EnvironmentVariables="VerifyRunning=1"
+          StandardOutputImportance="high"
+          ContinueOnError="ErrorAndContinue" />
+
+    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level info --report-not-configurable"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          EnvironmentVariables="VerifyRunning=1"
+          StandardOutputImportance="high"
+          IgnoreStandardErrorWarningFormat="true"
+          ContinueOnError="ErrorAndContinue" />
+  </Target>
+
+  <!--
+    Advisory sweep, never part of a build:
+
+        dotnet build -t:VerifyDeep
+
+    Reports hidden-severity findings (add braces, explicit type,
+    comment-to-doc-comment...). Every one of those severities is a deliberate
+    choice in .editorconfig, so this is something to read when reconsidering a
+    style decision, not a list of defects - which is why it does not gate.
+    Default verbosity on purpose: -v minimal collapses it to a bare count.
+  -->
+  <Target Name="VerifyDeep" DependsOnTargets="Build">
+    <Exec Command="dotnet tool restore"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          EnvironmentVariables="VerifyRunning=1"
+          StandardOutputImportance="low" />
+
+    <Exec Command="dotnet roslynator analyze &quot;$(MSBuildProjectFullPath)&quot; --severity-level hidden --report-not-configurable"
+          WorkingDirectory="$(MSBuildThisFileDirectory)"
+          EnvironmentVariables="VerifyRunning=1"
+          StandardOutputImportance="high"
+          IgnoreStandardErrorWarningFormat="true"
+          IgnoreExitCode="true" />
+  </Target>
+
 </Project>

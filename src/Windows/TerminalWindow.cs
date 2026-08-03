@@ -4,10 +4,12 @@ using Assets.Scripts.GridSystem;
 using Assets.Scripts.Inventory;
 using Assets.Scripts.UI.ImGuiUi;
 using ImGuiNET;
+using SerialTerminal.Devices;
+using SerialTerminal.Display;
 using UI.ImGuiUi.ImGuiWindows;
 using UnityEngine;
 
-namespace SerialTerminal
+namespace SerialTerminal.Windows
 {
     /// <summary>
     /// The interactive terminal window, registered with the game's

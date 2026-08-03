@@ -5,6 +5,9 @@ using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using LaunchPadBooster;
+using SerialTerminal.Devices;
+using SerialTerminal.Networking;
+using SerialTerminal.Prefabs;
 using UnityEngine;
 
 namespace SerialTerminal

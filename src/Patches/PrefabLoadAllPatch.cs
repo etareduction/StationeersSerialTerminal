@@ -1,8 +1,9 @@
 using System.Diagnostics.CodeAnalysis;
 using Assets.Scripts.Objects;
 using HarmonyLib;
+using SerialTerminal.Prefabs;
 
-namespace SerialTerminal
+namespace SerialTerminal.Patches
 {
     /// <summary>
     /// The mod's only Harmony patch. Prefab cloning must run at Prefab.LoadAll

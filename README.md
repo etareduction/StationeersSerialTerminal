@@ -36,6 +36,36 @@ Run it from `src/`: `global.json` pins the SDK to 8.0.x and resolves against the
 working directory, not the project directory, so building from the repo root
 would skip the pin.
 
+## Verifying
+
+Verification is part of the build. Every `dotnet build` runs three gates, and
+a finding in any of them fails the build:
+
+- **compiler** — the analyzer packages (Meziantou, Roslynator, Unity) and the
+  IDE rules configured in `.editorconfig`, warnings as errors. It cannot run
+  all of them: the simplification analyzers (`IDE0001` and friends) need a
+  workspace and never fire from `csc`.
+- **`dotnet format --verify-no-changes --severity info`** — whitespace, style
+  and analyzer fixers. The only gate that reports the simplification rules, so
+  a clean compile alone does not mean a clean tree.
+- **`roslynator analyze --severity-level info --report-not-configurable`** — a
+  second analyzer host, reaching info severity and the `NotConfigurable`
+  diagnostics the other two never surface.
+
+The two out-of-process gates cost about 13s on top of a ~2s compile. For a
+fast inner loop:
+
+    dotnet build -p:SkipVerify=true
+
+An advisory sweep lists hidden-severity findings (add braces, explicit type,
+comment-to-doc-comment...):
+
+    dotnet build -t:VerifyDeep
+
+Every one of those severities is a deliberate choice in `.editorconfig`, so
+that sweep never gates — read it when reconsidering a style decision, not as a
+list of defects.
+
 ## Installing
 
 The build writes `SerialTerminal.dll` straight into [`mod/`](mod), which *is*

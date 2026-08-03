@@ -60,7 +60,7 @@ dotnet_style_require_accessibility_modifiers = for_non_interface_members:silent
 dotnet_style_coalesce_expression = true:warning
 dotnet_style_collection_initializer = true:warning
 dotnet_style_explicit_tuple_names = true:warning
-dotnet_style_namespace_match_folder = false
+dotnet_style_namespace_match_folder = true
 dotnet_style_null_propagation = true:warning
 dotnet_style_object_initializer = true:warning
 dotnet_style_operator_placement_when_wrapping = beginning_of_line
@@ -311,6 +311,7 @@ dotnet_diagnostic.RCS1213.severity = warning   # remove unused member declaratio
 # build (warnings-as-errors), roslynator and dotnet format all report them
 # too. The dotnet_diagnostic form is the one the build reliably honours; the
 # :warning suffixes on the option lines above only steer IDE display.
+dotnet_diagnostic.IDE0001.severity = warning   # simplify name
 dotnet_diagnostic.IDE0016.severity = warning   # use throw expression
 dotnet_diagnostic.IDE0017.severity = warning   # simplify object initialization
 dotnet_diagnostic.IDE0018.severity = warning   # inline variable declaration
@@ -339,6 +340,7 @@ dotnet_diagnostic.IDE0074.severity = warning   # use coalesce compound assignmen
 dotnet_diagnostic.IDE0075.severity = warning   # simplify conditional expression
 dotnet_diagnostic.IDE0083.severity = warning   # use not pattern
 dotnet_diagnostic.IDE0090.severity = warning   # simplify new expression (target-typed)
+dotnet_diagnostic.IDE0130.severity = warning   # namespace must match folder structure
 dotnet_diagnostic.IDE0150.severity = warning   # null check over type check
 dotnet_diagnostic.IDE0160.severity = warning   # block-scoped namespace
 dotnet_diagnostic.IDE1005.severity = warning   # conditional delegate call
@@ -367,9 +369,9 @@ MA0051.maximum_statements_per_method = 60
 # passes null, and guard clauses in per-frame paths are pure noise.
 dotnet_diagnostic.CA1062.severity = none
 
-# This repo groups small related types per file (e.g. the screen-rendering
-# stack in ScreenRenderer.cs); one-type-per-file is not the layout here.
-dotnet_diagnostic.MA0048.severity = none       # file name must match type name
+# One top-level type per file, named after it, in a folder matching its
+# namespace (src/Display/TerminalDraw.cs -> SerialTerminal.Display.TerminalDraw).
+dotnet_diagnostic.MA0048.severity = warning    # file name must match type name
 
 # Types are instantiated by Unity (AddComponent), Harmony and the save
 # deserializer, which static analysis cannot see.
