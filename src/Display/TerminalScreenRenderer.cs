@@ -1,5 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
-using ImGuiNET.Unity;
+using SerialTerminal.Core;
 using SerialTerminal.Devices;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -7,10 +7,11 @@ using UnityEngine.Rendering;
 namespace SerialTerminal.Display
 {
     /// <summary>
-    /// Owns the screen quad, its RenderTexture and the per-device ImGui mesh
-    /// renderer; repaints the texture whenever the terminal content version
-    /// changes. Attached at runtime by TerminalScreenBehaviour, on clients only:
-    /// this class cannot load on the dedicated server (fields need RG.ImGui.Unity).
+    /// Unity wiring for one in-world terminal screen: builds the screen quad,
+    /// owns an <see cref="OffscreenSurface"/> and repaints it whenever the
+    /// terminal snapshot version changes. Attached at runtime by
+    /// TerminalScreenBehaviour, on clients only: this class cannot load on the
+    /// dedicated server (fields need RG.ImGui.Unity).
     /// </summary>
     [RequireComponent(typeof(SerialTerminalDevice), typeof(TerminalScreenBehaviour))]
     [SuppressMessage("Design", "CA1001:Types that own disposable fields should be disposable",
@@ -25,9 +26,7 @@ namespace SerialTerminal.Display
 
         private SerialTerminalDevice _device;
         private TerminalScreenBehaviour _data;
-        private RenderTexture _texture;
-        private CommandBuffer _commandBuffer;
-        private ImGuiRendererMesh _renderer;
+        private OffscreenSurface _surface;
         private MeshRenderer _quadRenderer;
         private Material _material;
         private int _renderedVersion = -1;
@@ -59,7 +58,7 @@ namespace SerialTerminal.Display
                 return;
             }
 
-            bool visible = _device.OnOff && _device.Powered;
+            bool visible = _device.IsOperating;
             if (_quadRenderer.enabled != visible)
             {
                 _quadRenderer.enabled = visible;
@@ -69,21 +68,17 @@ namespace SerialTerminal.Display
                 return;
             }
 
-            int version = _device.ScreenVersion;
-            if (version == _renderedVersion)
+            TerminalSnapshot snapshot = _device.GetSnapshot();
+            if (snapshot.Version == _renderedVersion)
             {
                 return;
             }
-            if (OffscreenImGui.Render(_texture, _renderer, _commandBuffer, _device))
+            if (OffscreenImGui.Render(_surface, snapshot))
             {
-                _renderedVersion = version;
+                _renderedVersion = snapshot.Version;
             }
         }
 
-        [SuppressMessage("Maintainability", "CA1508:Avoid dead conditional code",
-            Justification = "False positive: CreateRenderer returns null when the game's shader resources are missing")]
-        [SuppressMessage("Style", "IDE0029:Null check can be simplified",
-            Justification = "?? on UnityEngine.Object bypasses the lifetime-aware == operator; a destroyed anchor must fall through to the fallbacks")]
         private bool EnsureSetup()
         {
             if (_quadRenderer != null)
@@ -92,64 +87,49 @@ namespace SerialTerminal.Display
             }
             if (!OffscreenImGui.EnsureContext())
             {
-                return false;
-            }
-            _renderer = OffscreenImGui.CreateRenderer();
-            if (_renderer == null)
-            {
-                SerialTerminalPlugin.Log.LogWarning("Terminal screen: no ImGui renderer available");
-                _setupFailed = true;
+                // Main ImGui context not up yet; retry on a later frame.
                 return false;
             }
 
-            // Screen size: the size captured from the source prefab's monitor canvas,
-            // else the LogicDisplay panel width (square).
-            float width;
-            float height;
-            if (_data.ScreenWorldWidth > 0f && _data.ScreenWorldHeight > 0f)
+            // Pose + size of the monitor face, captured at prefab build from the
+            // vanilla Computer's canvas; PrefabFactory refuses to register the
+            // prefab without it, so a miss here means a broken prefab.
+            Transform anchor = _data.ScreenAnchor;
+            float width = _data.ScreenWorldWidth;
+            float height = _data.ScreenWorldHeight;
+            if (anchor == null || width <= 0f || height <= 0f)
             {
-                width = _data.ScreenWorldWidth;
-                height = _data.ScreenWorldHeight;
-            }
-            else
-            {
-                width = Mathf.Max(0.1f, _device.MaxPixelWidth);
-                height = width;
+                SerialTerminalPlugin.Log.LogWarning("Terminal screen: prefab carries no captured screen pose");
+                _setupFailed = true;
+                return false;
             }
 
             // Texture matches the screen's aspect so glyphs aren't stretched.
             const int texWidth = 512;
-            int texHeight = Mathf.Clamp(Mathf.RoundToInt(texWidth * height / width), 128, 2048);
-            _texture = new RenderTexture(texWidth, texHeight, 0, RenderTextureFormat.ARGB32,
-                RenderTextureReadWrite.sRGB)
+            int texHeight = Mathf.RoundToInt(texWidth * height / width);
+            _surface = OffscreenSurface.TryCreate(texWidth, texHeight);
+            if (_surface == null)
             {
-                name = "SerialTerminalScreen",
-                filterMode = FilterMode.Bilinear
-            };
-            if (!_texture.Create())
-            {
-                SerialTerminalPlugin.Log.LogWarning(
-                    $"Terminal screen: could not create the {texWidth}x{texHeight} render texture");
+                // TryCreate logged the reason; with the context up, it is final.
                 _setupFailed = true;
                 return false;
             }
-            _commandBuffer = new CommandBuffer { name = "SerialTerminalScreen" };
 
-            Shader shader = FindScreenShader();
+            // The one shader this screen supports; if a game update strips it
+            // from the build, fail loudly instead of guessing with another.
+            Shader shader = Shader.Find("Unlit/Texture");
             if (shader == null)
             {
-                SerialTerminalPlugin.Log.LogWarning("Terminal screen: no usable unlit shader found");
+                SerialTerminalPlugin.Log.LogWarning("Terminal screen: the Unlit/Texture shader is missing from the game build");
+                _surface.Dispose();
+                _surface = null;
                 _setupFailed = true;
                 return false;
             }
-            _material = new Material(shader) { mainTexture = _texture };
+            _material = new Material(shader) { mainTexture = _surface.Texture };
 
-            // The anchor may be an inactive GameObject (the disabled vanilla canvas),
+            // The anchor is an inactive GameObject (the disabled vanilla canvas),
             // so the quad is parented to the device and copies the anchor's world pose.
-            Transform anchor = _data.ScreenAnchor != null
-                ? _data.ScreenAnchor
-                : (_device.DigitTransform != null ? _device.DigitTransform : _device.transform);
-
             // Double-sided mesh: canvas/quad facing conventions differ per prefab, and
             // a wrong guess means an invisible (backface-culled) screen. The back side
             // mirrors UVs so the text reads correctly from whichever side is visible.
@@ -171,9 +151,6 @@ namespace SerialTerminal.Display
             _quadRenderer.sharedMaterial = _material;
             _quadRenderer.shadowCastingMode = ShadowCastingMode.Off;
             _quadRenderer.receiveShadows = false;
-            SerialTerminalPlugin.Log.LogInfo(
-                $"Terminal screen quad at {quad.transform.position} (anchor fwd {anchor.forward}),"
-                + $" {width:F3}x{height:F3} m, texture {texWidth}x{texHeight}, shader {shader.name}");
             return true;
         }
 
@@ -211,37 +188,12 @@ namespace SerialTerminal.Display
             return mesh;
         }
 
-        private static Shader FindScreenShader()
-        {
-            string[] candidates = ["Unlit/Texture", "UI/Default", "Sprites/Default", "Standard"];
-            foreach (string shaderName in candidates)
-            {
-                Shader shader = Shader.Find(shaderName);
-                if (shader != null)
-                {
-                    return shader;
-                }
-            }
-            return null;
-        }
-
         [SuppressMessage("CodeQuality", "IDE0051:Remove unused private members",
             Justification = "Unity message, called by the engine")]
         private void OnDestroy()
         {
-            if (_renderer != null)
-            {
-                OffscreenImGui.DestroyRenderer(_renderer);
-                _renderer = null;
-            }
-            _commandBuffer?.Release();
-            _commandBuffer = null;
-            if (_texture != null)
-            {
-                _texture.Release();
-                Destroy(_texture);
-                _texture = null;
-            }
+            _surface?.Dispose();
+            _surface = null;
             if (_material != null)
             {
                 Destroy(_material);

@@ -100,12 +100,23 @@ screen-overlay context from `ImGuiManager.LateUpdate`. Two uses here:
   quad placed at the monitor face — pose and size captured at prefab build from the
   vanilla Computer's `ComputerScreen` world-space canvas (then deactivated), stored
   in `TerminalScreenBehaviour.ScreenAnchor/ScreenWorldWidth/Height`.
-  `TerminalScreenBehaviour` repaints the texture only when the device's screen
+  `TerminalScreenRenderer` repaints the texture only when the device's screen
   version changes — zero cost while idle. Font scale is computed per repaint so the
   whole cell grid fills the texture.
 
-The screen buffer keeps a monotonically increasing `ScreenVersion`;
-`SnapshotLines()` returns a cached main-thread copy rebuilt only on version change.
+Simulation and presentation are separated: `TerminalState` (`src/Core/`) owns the
+UART registers, screen emulation and input FIFO with no Unity or ImGui types;
+`SyncedTerminal` wraps it behind the lock (IC10 runs off the main thread), stamps
+screen changes with a monotonically increasing version and caches the
+presentation snapshot per version; `SerialTerminalDevice` is a thin adapter that
+delegates and maps the returned change flags onto network dirty bits. Renderers
+draw only from immutable version-stamped `TerminalSnapshot`s.
+
+Namespace rule: `Core` is pure simulation (no Unity/ImGui), `Devices` +
+`Networking` are server-safe game integration, `Display` is client-only ImGui
+presentation — nothing in it may load on the dedicated server, which is why the
+ImGui-free `TerminalScreenBehaviour` data carrier lives in `Devices` — and
+`Prefabs`/`Patches` run at prefab-build time only.
 The vanilla numeric readout draws only for displays in
 `LogicDisplayDigitRenderer.ActiveDisplays`; `SerialTerminalDevice.OnAddToPool`
 vetoes membership in that pool, so `SetDisplay` may run (it needs the dummy
@@ -118,8 +129,10 @@ FPGA mod conventions):
 
 1. Harmony prefix on `Prefab.LoadAll`:
    - Clone `StructureComputer` ("Computer (Modern)" — the free-standing
-     monitor-and-keyboard block; `StructureConsoleLED5Large`/`StructureConsoleLED1x2`
-     are fallbacks) under a hidden DontDestroyOnLoad parent.
+     monitor-and-keyboard block) under a hidden DontDestroyOnLoad parent. It is
+     the only supported source: if the game renames it or drops its monitor
+     canvas, the factory logs an error and registers nothing — the mod stays
+     inert until updated, rather than guessing a screen pose on another prefab.
    - Replace its device component with `SerialTerminalDevice : LogicDisplay`
      (field-copy of the shared base-class chain via reflection, then fix
      `Interactables[].Parent`, slot/collider back-references; interface backing
@@ -132,7 +145,7 @@ FPGA mod conventions):
      This `Prefab.LoadAll` prefix is the mod's only Harmony patch.
 2. Rendering: ImGui on a RenderTexture quad over the monitor face (see the ImGui
    section above); the vanilla numeric readout is suppressed by the `OnAddToPool`
-   veto (no patch). Grid is fixed at 20×40 (constants in `SerialTerminalDevice`;
+   veto (no patch). Grid is fixed at 20×40 (constants in `TerminalState`;
    no config).
 3. Sync/persistence:
    - Server→client on class-specific `NetworkUpdateFlags` bits in

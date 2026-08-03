@@ -3,7 +3,7 @@ using Assets.Scripts.UI;
 using HarmonyLib;
 using ImGuiNET;
 using ImGuiNET.Unity;
-using SerialTerminal.Devices;
+using SerialTerminal.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -51,7 +51,6 @@ namespace SerialTerminal.Display
             style.WindowBorderSize = 0f;
             style.WindowPadding = new Vector2(8f, 8f);
             ImGui.SetCurrentContext(mainContext);
-            SerialTerminalPlugin.Log.LogInfo("Offscreen ImGui context created (shared font atlas)");
             return true;
         }
 
@@ -92,20 +91,18 @@ namespace SerialTerminal.Display
         }
 
         /// <summary>
-        /// Runs one ImGui frame in the offscreen context and renders it into the
-        /// given RenderTexture immediately.
+        /// Runs one ImGui frame in the offscreen context and renders the snapshot
+        /// into the surface's RenderTexture immediately.
         /// </summary>
-        /// <param name="target">RenderTexture the frame is drawn into.</param>
-        /// <param name="renderer">Per-screen mesh renderer from CreateRenderer.</param>
-        /// <param name="commandBuffer">Command buffer reused for the blit.</param>
-        /// <param name="device">The terminal whose cells are drawn.</param>
-        public static bool Render(RenderTexture target, ImGuiRendererMesh renderer,
-            CommandBuffer commandBuffer, SerialTerminalDevice device)
+        /// <param name="surface">The screen's offscreen rendering resources.</param>
+        /// <param name="snapshot">The screen content to draw.</param>
+        public static bool Render(OffscreenSurface surface, TerminalSnapshot snapshot)
         {
             if (_context == IntPtr.Zero || !MainContextReady)
             {
                 return false;
             }
+            RenderTexture target = surface.Texture;
             IntPtr mainContext = ImGui.GetCurrentContext();
             ImGui.SetCurrentContext(_context);
             try
@@ -118,10 +115,9 @@ namespace SerialTerminal.Display
                 ImFontPtr font = io.TerminalFont;
                 float charW = font.GetCharAdvance('M');
                 float lineH = font.FontSize;
-                const float pad = 16f;
                 float scale = Mathf.Min(
-                    (target.width - pad) / (SerialTerminalDevice.Columns * charW),
-                    (target.height - pad) / (SerialTerminalDevice.Rows * lineH));
+                    (target.width - TerminalDraw.Pad) / (snapshot.Lines[0].Length * charW),
+                    (target.height - TerminalDraw.Pad) / (snapshot.Lines.Length * lineH));
                 io.FontGlobalScale = Mathf.Max(0.1f, scale);
 
                 ImGui.NewFrame();
@@ -134,16 +130,17 @@ namespace SerialTerminal.Display
                     | ImGuiWindowFlags.NoScrollWithMouse | ImGuiWindowFlags.NoCollapse
                     | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoInputs);
                 ImGui.PushFont(font);
-                device.DrawBuffer();
+                snapshot.Draw();
                 ImGui.PopFont();
                 ImGui.End();
                 ImGui.PopStyleColor();
                 ImGui.Render();
 
+                CommandBuffer commandBuffer = surface.CommandBuffer;
                 commandBuffer.Clear();
                 commandBuffer.SetRenderTarget(target);
                 commandBuffer.ClearRenderTarget(clearDepth: true, clearColor: true, Color.black);
-                renderer.RenderDrawLists(commandBuffer, ImGui.GetDrawData());
+                surface.Renderer.RenderDrawLists(commandBuffer, ImGui.GetDrawData());
                 Graphics.ExecuteCommandBuffer(commandBuffer);
                 return true;
             }

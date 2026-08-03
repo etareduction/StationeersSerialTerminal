@@ -1,17 +1,18 @@
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using Assets.Scripts;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
 using LaunchPadBooster;
 using SerialTerminal.Devices;
 using SerialTerminal.Networking;
-using SerialTerminal.Prefabs;
-using UnityEngine;
 
 namespace SerialTerminal
 {
+    /// <summary>
+    /// Display names and descriptions come exclusively from the mod folder's
+    /// GameData/Language XML; a bare DLL install shows raw prefab names, which
+    /// is the intended signal that the install is broken.
+    /// </summary>
     [BepInPlugin(GUID, NAME, VERSION)]
     public class SerialTerminalPlugin : BaseUnityPlugin
     {
@@ -23,14 +24,6 @@ namespace SerialTerminal
 
         internal static ManualLogSource Log;
         private static bool _initialized;
-
-        /// <summary>
-        /// No public API adds thing localization entries; the dictionary itself is
-        /// private, so this one reflection read stays.
-        /// </summary>
-        private static readonly AccessTools.FieldRef<Dictionary<int, Localization.LocalizationThingDat>> ThingLocalizedRef =
-            AccessTools.StaticFieldRefAccess<Dictionary<int, Localization.LocalizationThingDat>>(
-                AccessTools.Field(typeof(Localization), "ThingLocalized"));
 
         [SuppressMessage("Reliability", "CA2000:Dispose objects before losing scope",
             Justification = "Disposing the Harmony instance would unpatch; patches must live for the process lifetime")]
@@ -49,41 +42,8 @@ namespace SerialTerminal
             MOD.AddSaveDataType<SerialTerminalSaveData>();
             MOD.Networking.RegisterMessage<TerminalInputMessage>();
 
-            // LanguageFolder.LoadAll (its only caller is SetLanguage) rebuilds the
-            // localization tables and fires OnLanguageChanged right after; run once
-            // immediately too, in case the initial load happened before this plugin.
-            Localization.OnLanguageChanged += AddLocalizationFallback;
-            AddLocalizationFallback();
-
             new Harmony(GUID).PatchAll(typeof(SerialTerminalPlugin).Assembly);
             Log.LogInfo($"SerialTerminal {VERSION} initialized");
-        }
-
-        /// <summary>
-        /// Fallback display names/descriptions in case the mod's GameData/Language XML
-        /// was not merged (e.g. the DLL was dropped somewhere without the mod folder).
-        /// XML wins: entries are only added when missing.
-        /// </summary>
-        private static void AddLocalizationFallback()
-        {
-            AddIfMissing(PrefabFactory.TerminalPrefabName, "Serial Terminal",
-                "The Norsec TTY-6 serial terminal.");
-            AddIfMissing(PrefabFactory.KitPrefabName, "Kit (Serial Terminal)",
-                "This kit places a Norsec TTY-6 serial terminal.");
-        }
-
-        private static void AddIfMissing(string prefabName, string displayName, string description)
-        {
-            Dictionary<int, Localization.LocalizationThingDat> things = ThingLocalizedRef();
-            int key = Animator.StringToHash(prefabName);
-            if (!things.ContainsKey(key))
-            {
-                things[key] = new Localization.LocalizationThingDat
-                {
-                    PrefabName = displayName,
-                    Description = description
-                };
-            }
         }
     }
 }

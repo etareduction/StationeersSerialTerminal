@@ -1,10 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using Assets.Scripts;
-using SerialTerminal.Devices;
+using SerialTerminal.Display;
 using UnityEngine;
 
-namespace SerialTerminal.Display
+namespace SerialTerminal.Devices
 {
     /// <summary>
     /// Lives next to SerialTerminalDevice on the prefab; carries the serialized
@@ -12,7 +12,9 @@ namespace SerialTerminal.Display
     /// the ImGui renderer component. Deliberately free of ImGui-typed members:
     /// the dedicated server ships no RG.ImGui assemblies, and one such field is
     /// enough to make this class - and with it the whole prefab build - fail to
-    /// load there (TypeLoadException at AddComponent).
+    /// load there (TypeLoadException at AddComponent). That server-safety is
+    /// also why it sits in Devices, not Display: everything in Display is
+    /// client-only by rule.
     /// </summary>
     public class TerminalScreenBehaviour : MonoBehaviour
     {

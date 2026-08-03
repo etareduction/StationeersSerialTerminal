@@ -434,3 +434,8 @@ dotnet_diagnostic.MA0003.severity = none       # name the parameter
 
 # This codebase does not use trailing commas in initializers.
 dotnet_diagnostic.MA0007.severity = none       # add comma after last value
+
+# Enum.HasFlag boxes both the receiver and the argument under Unity's Mono JIT
+# (no CoreCLR-style intrinsic), and the flag checks here sit on the IC10
+# register path; explicit bitwise tests against the enum's None member instead.
+dotnet_diagnostic.MA0192.severity = none       # use HasFlag instead of bitwise checks

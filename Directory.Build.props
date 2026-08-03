@@ -30,4 +30,10 @@
     <PackageReference Include="Microsoft.Unity.Analyzers" Version="1.26.0" PrivateAssets="all" />
   </ItemGroup>
 
+  <ItemGroup Label="Polyfills">
+    <!-- Compile-time source generator: emits the BCL shims modern C# needs on
+         net472 (IsExternalInit, RequiredMember, ...). Ships no runtime DLL. -->
+    <PackageReference Include="PolySharp" Version="1.16.0" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

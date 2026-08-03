@@ -1,20 +1,24 @@
 using ImGuiNET;
-using SerialTerminal.Devices;
+using SerialTerminal.Core;
 using UnityEngine;
 
 namespace SerialTerminal.Display
 {
     /// <summary>
     /// Shared terminal drawing helpers used by both the interactive window (main
-    /// ImGui context) and the in-world screen (offscreen context).
+    /// ImGui context) and the in-world screen (offscreen context). Draws from
+    /// immutable <see cref="TerminalSnapshot"/>s only — presentation never
+    /// touches live terminal state.
     /// </summary>
     internal static class TerminalDraw
     {
-        public static readonly uint WindowBackground = new Color32(16, 16, 16, 255).ImGuiColor;
-        public static readonly uint ScreenBackground = new Color32(2, 8, 2, 255).ImGuiColor;
+        /// <summary>Padding around the cell grid, shared by both drawing surfaces.</summary>
+        public const float Pad = 16f;
+
+        public static readonly uint ScreenBackground = Abgr(new Color32(2, 8, 2, 255));
 
         /// <summary>Phosphor green (#33FF33).</summary>
-        public static readonly uint TextColor = new Color32(51, 255, 51, 255).ImGuiColor;
+        public static readonly uint TextColor = Abgr(new Color32(51, 255, 51, 255));
 
         /// <summary>Translucent block cursor over the phosphor green.</summary>
         public static readonly uint CursorColor = (TextColor & 0x00FFFFFFu) | 0xA0000000u;
@@ -25,15 +29,14 @@ namespace SerialTerminal.Display
             public ImFontPtr TerminalFont => io.Fonts.Fonts[0];
         }
 
-        extension(SerialTerminalDevice device)
+        extension(TerminalSnapshot snapshot)
         {
             /// <summary>
-            /// Draws the terminal's cell grid plus block cursor at the current
+            /// Draws the snapshot's cell grid plus block cursor at the current
             /// cursor position of the current ImGui window. Caller pushes the font.
             /// </summary>
-            public void DrawBuffer()
+            public void Draw()
             {
-                string[] lines = device.SnapshotLines(out int cursorRow, out int cursorCol);
                 float lineH = ImGui.GetTextLineHeight();
                 float charW = ImGui.CalcTextSize("M").x;
                 ImDrawListPtr drawList = ImGui.GetWindowDrawList();
@@ -41,22 +44,25 @@ namespace SerialTerminal.Display
 
                 ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0f, 0f));
                 ImGui.PushStyleColor(ImGuiCol.Text, TextColor);
-                for (int r = 0; r < lines.Length; r++)
+                foreach (string line in snapshot.Lines)
                 {
-                    ImGui.TextUnformatted(lines[r]);
+                    ImGui.TextUnformatted(line);
                 }
                 ImGui.PopStyleColor();
                 ImGui.PopStyleVar();
 
-                Vector2 cursorMin = new(origin.x + (cursorCol * charW), origin.y + (cursorRow * lineH));
+                Vector2 cursorMin = new(
+                    origin.x + (snapshot.CursorCol * charW),
+                    origin.y + (snapshot.CursorRow * lineH));
                 drawList.AddRectFilled(cursorMin, cursorMin + new Vector2(charW, lineH), CursorColor);
             }
         }
 
-        extension(Color32 c)
+        /// <summary>The color packed in ImGui's ABGR order.</summary>
+        /// <param name="c">The color to pack.</param>
+        private static uint Abgr(Color32 c)
         {
-            /// <summary>The color packed in ImGui's ABGR order.</summary>
-            public uint ImGuiColor => ((uint)c.a << 24) | ((uint)c.b << 16) | ((uint)c.g << 8) | c.r;
+            return ((uint)c.a << 24) | ((uint)c.b << 16) | ((uint)c.g << 8) | c.r;
         }
     }
 }

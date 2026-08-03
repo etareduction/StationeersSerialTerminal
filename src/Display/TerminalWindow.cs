@@ -4,12 +4,12 @@ using Assets.Scripts.GridSystem;
 using Assets.Scripts.Inventory;
 using Assets.Scripts.UI.ImGuiUi;
 using ImGuiNET;
+using SerialTerminal.Core;
 using SerialTerminal.Devices;
-using SerialTerminal.Display;
 using UI.ImGuiUi.ImGuiWindows;
 using UnityEngine;
 
-namespace SerialTerminal.Windows
+namespace SerialTerminal.Display
 {
     /// <summary>
     /// The interactive terminal window, registered with the game's
@@ -88,14 +88,15 @@ namespace SerialTerminal.Windows
             // Human respawn re-enables player keys; keep them off while we're open.
             InventoryManager.EnablePlayerKeys = false;
 
+            TerminalSnapshot snapshot = device.GetSnapshot();
             ImGuiIOPtr io = ImGui.GetIO();
             ImGui.PushFont(io.TerminalFont);
 
             float charW = ImGui.CalcTextSize("M").x;
             float lineH = ImGui.GetTextLineHeight();
             Vector2 screenSize = new(
-                (SerialTerminalDevice.Columns * charW) + 16f,
-                (SerialTerminalDevice.Rows * lineH) + 16f);
+                (snapshot.Lines[0].Length * charW) + TerminalDraw.Pad,
+                (snapshot.Lines.Length * lineH) + TerminalDraw.Pad);
 
             if (_justOpened)
             {
@@ -109,14 +110,14 @@ namespace SerialTerminal.Windows
                 ImGui.SetWindowFocus();
             }
 
-            bool powered = device.OnOff && device.Powered;
+            bool powered = device.IsOperating;
 
             ImGui.PushStyleColor(ImGuiCol.ChildBg, TerminalDraw.ScreenBackground);
             _ = ImGui.BeginChild("##terminalscreen", screenSize, border: true,
                 ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
             if (powered)
             {
-                device.DrawBuffer();
+                snapshot.Draw();
             }
             ImGui.EndChild();
             ImGui.PopStyleColor();
@@ -147,9 +148,9 @@ namespace SerialTerminal.Windows
 
         /// <summary>
         /// Forwards this frame's typed characters (Unity legacy input, includes
-        /// OS key repeat) to the device. Enter arrives as '\n' or '\r' depending
-        /// on platform; both are sent as CR (13). Backspace arrives as '\b' (8)
-        /// and is sent through unchanged.
+        /// OS key repeat) to the device raw; the keyboard controller in
+        /// TerminalState normalizes Enter ('\n' or '\r' depending on platform)
+        /// to CR (13) and maps characters outside the terminal's set.
         /// </summary>
         /// <param name="device">The terminal receiving the keystrokes.</param>
         private static void SendKeystrokes(SerialTerminalDevice device)
@@ -157,7 +158,7 @@ namespace SerialTerminal.Windows
             string typed = Input.inputString;
             if (!string.IsNullOrEmpty(typed))
             {
-                device.SubmitInput(typed.Replace('\n', '\r'));
+                device.SubmitInput(typed);
             }
         }
 
