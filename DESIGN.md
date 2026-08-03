@@ -75,13 +75,15 @@ the IC10 tick (2 Hz) entirely. Echo happens even when the FIFO is full.
 Click the screen (`Activate` interactable added to the cloned prefab) → ImGui terminal
 window (`TerminalWindow`, drawn inside the game's own ImGui frame): the fixed cell grid
 mirroring the in-world screen. No input line — keystrokes are forwarded raw
-(`Input.inputString` per frame, Enter mapped to CR) into the input FIFO. On a client,
+(`Input.inputString` per frame) into the keyboard controller, which normalizes
+Enter to CR and out-of-set characters to `?` where the simulation runs. On a client,
 each frame's keystrokes travel to the server via a LaunchPadBooster
-`INetworkMessage` (`TerminalInputMessage { referenceId, text }`); guarded by the standard
+`INetworkMessage` (`TerminalInputMessage { terminalId, text }`); guarded by the standard
 "is local player" check used by `LogicHashGen`. Esc / close button / walking away
-(8 m) closes the window. Input capture uses the same pattern as
-the game's own creative spawn menu: `KeyManager.SetInputState(..., Typing)` +
-`MouseModeController.AddModal(ImGuiModal)`.
+(8 m) closes the window. Input capture: `ImGuiWindowManager` owns the Typing
+input state, plus a `MouseModeController.AddModal(ImGuiModal)` to keep the
+cursor unlocked and `InventoryManager.EnablePlayerKeys = false` for the raw
+key checks that ignore the Typing state.
 
 ## ImGui rendering (v0.2, replaces LED glyphs)
 
@@ -154,8 +156,8 @@ FPGA mod conventions):
      resends the unchanged screen.
    - Save: `SerialTerminalSaveData : LogicBaseSaveData` registered through
      LaunchPadBooster `Mod.AddSaveDataType<T>()`.
-   - `WriteMemory`/`ReadMemory` run on the sim thread; rendering marshalled to the main
-     thread (same pattern as vanilla `RenderText`).
+   - `WriteMemory`/`ReadMemory` run on the sim thread; `SyncedTerminal`'s lock and
+     version-stamped snapshots hand the results to the main-thread renderers.
 4. Localization + Stationpedia description + recipes via the standard mod-folder
    `GameData/*.xml` (`ElectronicsPrinterRecipes`, `Language/english.xml` RecordThing
    entries) — Stationpedia pages are auto-generated, and it will show

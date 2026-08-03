@@ -7,6 +7,7 @@ memory-mapped UART: IC10 circuits print to it and read typed input from it
 with `get`/`put`. Click the screen to type; each keystroke is delivered
 directly to the input buffer.
 
+- [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3776564224) — the released mod
 - [`mod/API.md`](mod/API.md) — the device's register-level API reference
 - [`DESIGN.md`](DESIGN.md) — how the mod is built and why
 - [`examples/`](examples) — IC10 programs: a self-test and two interactive shells
@@ -32,9 +33,9 @@ Then:
 
     cd src && dotnet build SerialTerminal.csproj -c Release
 
-Run it from `src/`: `global.json` pins the SDK to 8.0.x and resolves against the
-working directory, not the project directory, so building from the repo root
-would skip the pin.
+Run it from `src/` or the repo root: `global.json` (at the repo root) pins the
+SDK to 10.0.x and resolves against the working directory, not the project
+directory, so it applies from anywhere inside the repo.
 
 ## Verifying
 
@@ -69,6 +70,10 @@ that sweep never gates — read it when reconsidering a style decision, not as a
 list of defects.
 
 ## Installing
+
+The released mod is on the
+[Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3776564224);
+subscribing there needs none of the steps below.
 
 The build writes `SerialTerminal.dll` straight into [`mod/`](mod), which *is*
 the deployable mod folder. Symlink (or copy) it into the game's user-data mods
