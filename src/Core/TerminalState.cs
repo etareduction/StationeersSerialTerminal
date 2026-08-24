@@ -67,6 +67,9 @@ namespace SerialTerminal.Core
         /// </summary>
         private bool _wrapPending;
 
+        /// <summary>Block cursor visibility (CTRL 10/11); display-only.</summary>
+        private bool _cursorHidden;
+
         /// <summary>Colour applied to newly printed characters (colour plane char).</summary>
         private char _pen = DefaultColorChar;
 
@@ -137,7 +140,8 @@ namespace SerialTerminal.Core
                         | (Overflow ? 2 : 0)
                         | (_outputBuffered ? 4 : 0)
                         | (_inputBuffered ? 8 : 0)
-                        | (_localEcho ? 16 : 0);
+                        | (_localEcho ? 16 : 0)
+                        | (_cursorHidden ? 32 : 0);
                     return (flags, TerminalChange.None);
                 case TerminalRegister.Row:
                     return (_cursorRow, TerminalChange.None);
@@ -219,6 +223,8 @@ namespace SerialTerminal.Core
                 case TerminalCommand.InputBuffered: _inputBuffered = true; return TerminalChange.None;
                 case TerminalCommand.EchoOff: _localEcho = false; return TerminalChange.None;
                 case TerminalCommand.EchoOn: _localEcho = true; return TerminalChange.None;
+                case TerminalCommand.CursorHide: _cursorHidden = true; return TerminalChange.Screen;
+                case TerminalCommand.CursorShow: _cursorHidden = false; return TerminalChange.Screen;
                 case TerminalCommand.None:
                 default: return TerminalChange.None;
             }
@@ -242,6 +248,7 @@ namespace SerialTerminal.Core
             _outputBuffered = false;
             _inputBuffered = false;
             _localEcho = false;
+            _cursorHidden = false;
             return TerminalChange.Screen | TerminalChange.Status;
         }
 
@@ -429,7 +436,8 @@ namespace SerialTerminal.Core
                 Lines = lines,
                 Colors = colors,
                 CursorRow = _cursorRow,
-                CursorCol = _cursorCol
+                CursorCol = _cursorCol,
+                CursorVisible = !_cursorHidden
             };
         }
 
@@ -441,7 +449,8 @@ namespace SerialTerminal.Core
                 Text = PlaneToString(_cells),
                 Colors = PlaneToString(_colors),
                 CursorRow = _cursorRow,
-                CursorCol = _cursorCol
+                CursorCol = _cursorCol,
+                CursorHidden = _cursorHidden
             };
         }
 
@@ -453,6 +462,7 @@ namespace SerialTerminal.Core
             PlaneFromString(_colors, screen.Colors);
             _cursorRow = Clamp(screen.CursorRow, 0, Rows - 1);
             _cursorCol = Clamp(screen.CursorCol, 0, Columns - 1);
+            _cursorHidden = screen.CursorHidden;
             return TerminalChange.Screen;
         }
 

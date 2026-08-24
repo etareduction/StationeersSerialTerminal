@@ -19,5 +19,8 @@ namespace SerialTerminal.Core
         public required int CursorRow { get; init; }
 
         public required int CursorCol { get; init; }
+
+        /// <summary>False while the cursor is hidden (CTRL 10/11).</summary>
+        public required bool CursorVisible { get; init; }
     }
 }

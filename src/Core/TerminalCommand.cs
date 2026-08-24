@@ -26,6 +26,10 @@ namespace SerialTerminal.Core
 
         EchoOff = 8,
 
-        EchoOn = 9
+        EchoOn = 9,
+
+        CursorHide = 10,
+
+        CursorShow = 11
     }
 }

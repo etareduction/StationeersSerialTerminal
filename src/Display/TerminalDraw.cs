@@ -81,6 +81,7 @@ namespace SerialTerminal.Display
                 // Advance the layout cursor over the grid, as text items would.
                 ImGui.Dummy(new Vector2(snapshot.Lines[0].Length * charW, snapshot.Lines.Length * lineH));
 
+                if (!snapshot.CursorVisible) return;
                 Vector2 cursorMin = new(
                     origin.x + (snapshot.CursorCol * charW),
                     origin.y + (snapshot.CursorRow * lineH));

@@ -81,6 +81,8 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 | 7    | `CTRL_INPUT_BUFFERED`   | DATA reads pop up to 6 chars, packed   |
 | 8    | `CTRL_ECHO_OFF`         | Full duplex: no local echo (default)   |
 | 9    | `CTRL_ECHO_ON`          | Half duplex: keystrokes are echoed to the screen immediately |
+| 10   | `CTRL_CURSOR_HIDE`      | Hide the block cursor (display only)   |
+| 11   | `CTRL_CURSOR_SHOW`      | Show the block cursor (default)        |
 
 ### CTRL status (`get r? term 3`)
 
@@ -91,6 +93,7 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 | 2   | 4     | Output is in buffered mode      |
 | 3   | 8     | Input is in buffered mode       |
 | 4   | 16    | Local echo (half duplex) is on  |
+| 5   | 32    | Block cursor is hidden          |
 
 ### Control characters (DATA/STRING writes)
 

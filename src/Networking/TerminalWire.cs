@@ -20,6 +20,7 @@ namespace SerialTerminal.Networking
                 writer.WriteString(screen.Colors);
                 writer.WriteByte((byte)screen.CursorRow);
                 writer.WriteByte((byte)screen.CursorCol);
+                writer.WriteBoolean(screen.CursorHidden);
             }
 
             /// <summary>Writes the status payload: overflow + FIFO depth.</summary>
@@ -41,7 +42,8 @@ namespace SerialTerminal.Networking
                     Text = reader.ReadString(),
                     Colors = reader.ReadString(),
                     CursorRow = reader.ReadByte(),
-                    CursorCol = reader.ReadByte()
+                    CursorCol = reader.ReadByte(),
+                    CursorHidden = reader.ReadBoolean()
                 };
             }
 

@@ -12,13 +12,14 @@ alias opx r6
 alias i r7
 alias sc r8
 define ADDR_DATA 0
-define ADDR_STR 1
+define ADDR_CTRL 3
 define ADDR_ROW 4
 define ADDR_COL 5
 define PAD_W 6
 define PAD_ROW 18
 s term On 1
 clr term
+put term ADDR_CTRL 10    # hide the block cursor
 put term ADDR_DATA $2554 # frame: top rule from the home cursor...
 move i 1
 top:
@@ -44,7 +45,7 @@ blt i 39 bottom
 put term ADDR_DATA $255D
 put term ADDR_ROW 1
 put term ADDR_COL 2
-put term ADDR_STR STR("PONG")
+put term 1 STR("PONG")
 move vx 1
 move px 17
 move opx 17

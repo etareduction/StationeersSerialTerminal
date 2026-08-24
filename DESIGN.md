@@ -30,7 +30,7 @@ UART plus 6845 CRTC-style cursor address registers and a colour register:
 | 0    | DATA  | pop input: 1 char, or ≤6 chars packed ASCII-6 in buffered mode (0 if empty) | print: 1 char, or a packed ASCII-6 string in buffered mode |
 | 1    | STR   | peek next input char (no consume)     | print packed ASCII-6 string (`STR("HELLO ")`)  |
 | 2    | COUNT | input chars available                 | — (error)                                       |
-| 3    | CTRL  | status: bit0 input ready, bit1 overflow, bit2 output buffered, bit3 input buffered, bit4 local echo | 1 clear screen, 2 flush input, 3 clear overflow, 4/5 output unbuffered/buffered, 6/7 input unbuffered/buffered, 8/9 local echo off/on |
+| 3    | CTRL  | status: bit0 input ready, bit1 overflow, bit2 output buffered, bit3 input buffered, bit4 local echo, bit5 cursor hidden | 1 clear screen, 2 flush input, 3 clear overflow, 4/5 output unbuffered/buffered, 6/7 input unbuffered/buffered, 8/9 local echo off/on, 10/11 cursor hide/show |
 | 4    | ROW   | cursor row                            | set cursor row (clamped)                        |
 | 5    | COL   | cursor column                         | set cursor column (clamped)                     |
 | 6    | COLOR | current pen colour                    | set pen colour for newly printed characters: the standard logic colour values 0–11, -1 restores the default phosphor green (clamped) |

@@ -14,7 +14,7 @@ IC10 quick reference (device d0):
   put d0 1 str       - print a packed string, e.g. put d0 1 STR("HELLO ")
   get r0 d0 0        - pop next typed keystroke (0 if none; Enter=13, Backspace=8)
   get r0 d0 2        - characters waiting
-  put d0 3 1         - clear screen (2 flush input, 4-7 transfer modes, 8/9 local echo)
+  put d0 3 1         - clear screen (2 flush input, 4-7 transfer modes, 8/9 local echo, 10/11 cursor hide/show)
   put d0 4 row / put d0 5 col - move the cursor; get reads it back
   put d0 6 c         - set the text colour for what prints next (0-11 standard logic colours, e.g. Color.Red; -1 default green)
 Control codes: 8 BS, 10 LF, 12 FF, 13 CR, 127 rubout, 133 newline (CR+LF).

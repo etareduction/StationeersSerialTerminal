@@ -47,6 +47,10 @@ namespace SerialTerminal.Devices
         [XmlElement]
         public bool WrapPending;
 
+        /// <summary>Cursor hidden via CTRL 10; absent (visible) in older saves.</summary>
+        [XmlElement]
+        public bool CursorHidden;
+
         /// <summary>Fills the XML fields from a captured terminal state.</summary>
         /// <param name="memento">State captured at save time.</param>
         internal void CopyFrom(TerminalMemento memento)
@@ -62,6 +66,7 @@ namespace SerialTerminal.Devices
             LocalEcho = memento.LocalEcho;
             PenColor = memento.PenColor;
             WrapPending = memento.WrapPending;
+            CursorHidden = memento.Screen.CursorHidden;
         }
 
         /// <summary>The saved state as an immutable memento, ready to restore.</summary>
@@ -74,7 +79,8 @@ namespace SerialTerminal.Devices
                     Text = ScreenText,
                     Colors = ScreenColors,
                     CursorRow = CursorRow,
-                    CursorCol = CursorCol
+                    CursorCol = CursorCol,
+                    CursorHidden = CursorHidden
                 },
                 InputBuffer = string.IsNullOrEmpty(InputBuffer)
                     ? string.Empty
