@@ -5,14 +5,15 @@
 
 A Stationeers mod adding the Norsec TTY-6 Serial Terminal: a free-standing
 computer block — monitor, desk unit and keyboard — with no processor and no
-storage. It is a character display and keyboard wired to a six-register
+storage. It is a character display and keyboard wired to a seven-register
 memory-mapped UART: IC10 circuits print to it and read typed input from it
 with `get`/`put`. Click the screen to type; each keystroke is delivered
 directly to the input buffer.
 
 - [`mod/API.md`](mod/API.md) — the device's register-level API reference
 - [`DESIGN.md`](DESIGN.md) — how the mod is built and why
-- [`examples/`](examples) — IC10 programs: a self-test and two interactive shells
+- [`examples/`](examples) — IC10 programs: a self-test, a colour demo and two
+  interactive shells
 
 ## Building
 

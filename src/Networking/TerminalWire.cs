@@ -12,11 +12,12 @@ namespace SerialTerminal.Networking
     {
         extension(RocketBinaryWriter writer)
         {
-            /// <summary>Writes the screen payload: text + cursor cell.</summary>
+            /// <summary>Writes the screen payload: text + colour plane + cursor cell.</summary>
             /// <param name="screen">Wire form of the screen.</param>
             public void Write(ScreenContent screen)
             {
                 writer.WriteString(screen.Text);
+                writer.WriteString(screen.Colors);
                 writer.WriteByte((byte)screen.CursorRow);
                 writer.WriteByte((byte)screen.CursorCol);
             }
@@ -38,6 +39,7 @@ namespace SerialTerminal.Networking
                 return new ScreenContent
                 {
                     Text = reader.ReadString(),
+                    Colors = reader.ReadString(),
                     CursorRow = reader.ReadByte(),
                     CursorCol = reader.ReadByte()
                 };

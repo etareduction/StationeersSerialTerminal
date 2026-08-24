@@ -13,6 +13,9 @@ namespace SerialTerminal.Core
         /// <summary>One string per row, each padded to the full column count.</summary>
         public required string[] Lines { get; init; }
 
+        /// <summary>Colour plane: one encoding char per cell, same shape as <see cref="Lines"/>.</summary>
+        public required string[] Colors { get; init; }
+
         public required int CursorRow { get; init; }
 
         public required int CursorCol { get; init; }

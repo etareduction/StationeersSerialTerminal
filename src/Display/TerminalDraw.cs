@@ -1,3 +1,5 @@
+using Assets.Scripts;
+using Assets.Scripts.Objects;
 using ImGuiNET;
 using SerialTerminal.Core;
 using UnityEngine;
@@ -34,6 +36,7 @@ namespace SerialTerminal.Display
             /// <summary>
             /// Draws the snapshot's cell grid plus block cursor at the current
             /// cursor position of the current ImGui window. Caller pushes the font.
+            /// Consecutive same-coloured cells in a row share one draw call.
             /// </summary>
             public void Draw()
             {
@@ -42,20 +45,46 @@ namespace SerialTerminal.Display
                 ImDrawListPtr drawList = ImGui.GetWindowDrawList();
                 Vector2 origin = ImGui.GetCursorScreenPos();
 
-                ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(0f, 0f));
-                ImGui.PushStyleColor(ImGuiCol.Text, TextColor);
-                foreach (string line in snapshot.Lines)
+                for (int row = 0; row < snapshot.Lines.Length; row++)
                 {
-                    ImGui.TextUnformatted(line);
+                    string line = snapshot.Lines[row];
+                    string colors = snapshot.Colors[row];
+                    int col = 0;
+                    while (col < line.Length)
+                    {
+                        int start = col;
+                        char code = colors[col];
+                        while (col < line.Length && colors[col] == code) col++;
+                        drawList.AddText(
+                            new Vector2(origin.x + (start * charW), origin.y + (row * lineH)),
+                            CellColor(code),
+                            line[start..col]);
+                    }
                 }
-                ImGui.PopStyleColor();
-                ImGui.PopStyleVar();
+                // Advance the layout cursor over the grid, as text items would.
+                ImGui.Dummy(new Vector2(snapshot.Lines[0].Length * charW, snapshot.Lines.Length * lineH));
 
                 Vector2 cursorMin = new(
                     origin.x + (snapshot.CursorCol * charW),
                     origin.y + (snapshot.CursorRow * lineH));
                 drawList.AddRectFilled(cursorMin, cursorMin + new Vector2(charW, lineH), CursorColor);
             }
+        }
+
+        /// <summary>Draw colour for one colour plane char; phosphor green for
+        /// the default pen or a missing swatch.</summary>
+        /// <param name="code">Colour plane char from the snapshot.</param>
+        private static uint CellColor(char code)
+        {
+            int color = TerminalState.CharToColor(code);
+            ColorSwatch swatch = color < 0 ? null : GameManager.GetColorSwatch(color);
+            if (swatch == null)
+            {
+                return TextColor;
+            }
+            Color32 rgb = swatch.Color;
+            rgb.a = 255;
+            return Abgr(rgb);
         }
 
         /// <summary>The color packed in ImGui's ABGR order.</summary>

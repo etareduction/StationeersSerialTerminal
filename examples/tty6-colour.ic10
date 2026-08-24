@@ -1,0 +1,69 @@
+# TTY-6 colour register (COLOR, address 6) demo, terminal on d0.
+# Register checks tally into FAILS=n (0 = all pass), then one word
+# prints per standard logic colour value 0-11: earlier words keep
+# their colour as the pen changes. Color.Black (7) is unreadable on
+# the dark screen by nature; the last line is default green again.
+alias term d0
+alias c r0
+alias n r1
+alias p r2
+alias fails r3
+define ADDR_DATA 0
+define ADDR_STR 1
+define ADDR_ROW 4
+define ADDR_COL 5
+define ADDR_COLOR 6
+define COLOR_DEFAULT -1
+define CH_NEL 133
+move fails 0
+s term On 1
+clr term
+get n term ADDR_COLOR    # T1: pen reads -1 (default) after clr
+sub n n COLOR_DEFAULT
+jal check
+put term ADDR_COLOR Color.Red
+get n term ADDR_COLOR    # T2: pen readback
+sub n n Color.Red
+jal check
+put term ADDR_ROW 5      # T3: colour writes leave the cursor alone
+put term ADDR_COL 7
+put term ADDR_COLOR Color.Yellow
+get n term ADDR_ROW
+sub n n 5
+get p term ADDR_COL
+sub p p 7
+add n n p
+jal check
+put term ADDR_COLOR 99   # T4: writes clamp to -1..11
+get n term ADDR_COLOR
+sub n n Color.Purple
+jal check
+put term ADDR_COLOR -7
+get n term ADDR_COLOR
+sub n n COLOR_DEFAULT
+jal check
+put term ADDR_COLOR Color.Pink
+clr term                 # T5: clr restores the default pen
+get n term ADDR_COLOR
+sub n n COLOR_DEFAULT
+jal check
+put term ADDR_STR STR("FAILS=")
+add n fails 48
+put term ADDR_DATA n
+put term ADDR_DATA CH_NEL
+move c Color.Blue        # paint one word per colour, Blue (0) up
+paint:
+put term ADDR_COLOR c
+put term ADDR_STR STR("TEXT ")
+add c c 1
+ble c Color.Purple paint
+put term ADDR_COLOR COLOR_DEFAULT
+put term ADDR_DATA CH_NEL
+put term ADDR_STR STR("GREEN.")
+done:
+yield
+j done
+check:
+sne n n 0
+add fails fails n
+j ra

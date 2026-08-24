@@ -23,6 +23,10 @@ namespace SerialTerminal.Core
         Row = 4,
 
         /// <summary>rw: cursor column (clamped).</summary>
-        Col = 5
+        Col = 5,
+
+        /// <summary>rw: pen colour for newly printed characters (clamped) —
+        /// logic colours 0–11, -1 the default phosphor green.</summary>
+        Color = 6
     }
 }

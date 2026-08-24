@@ -3,11 +3,11 @@
   <Name>Serial Terminal</Name>
   <ModID>SerialTerminal</ModID>
   <Author>etareduction</Author>
-  <Version>0.5.0</Version>
+  <Version>0.6.0</Version>
   <Description>Source: https://github.com/etareduction/StationeersSerialTerminal
 Steam Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3776564224
 
-Adds the Norsec TTY-6 Serial Terminal: a free-standing computer block - monitor, desk unit and keyboard - with no processor and no storage. It is a character display and keyboard wired to a 6-register memory-mapped UART: IC10 circuits print to it and read typed input from it with get/put. Click the screen to type; each keystroke is delivered directly to the input buffer.
+Adds the Norsec TTY-6 Serial Terminal: a free-standing computer block - monitor, desk unit and keyboard - with no processor and no storage. It is a character display and keyboard wired to a 7-register memory-mapped UART: IC10 circuits print to it and read typed input from it with get/put. Click the screen to type; each keystroke is delivered directly to the input buffer.
 
 IC10 quick reference (device d0):
   put d0 0 char      - print one ASCII character
@@ -16,6 +16,7 @@ IC10 quick reference (device d0):
   get r0 d0 2        - characters waiting
   put d0 3 1         - clear screen (2 flush input, 4-7 transfer modes, 8/9 local echo)
   put d0 4 row / put d0 5 col - move the cursor; get reads it back
+  put d0 6 c         - set the text colour for what prints next (0-11 standard logic colours, e.g. Color.Red; -1 default green)
 Control codes: 8 BS, 10 LF, 12 FF, 13 CR, 127 rubout, 133 newline (CR+LF).
 Logic: Setting (write packed string), Quantity (input waiting), Error (input overflow), Color.
 

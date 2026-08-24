@@ -7,7 +7,7 @@ using Assets.Scripts.Objects.Electrical;
 namespace SerialTerminal.Core
 {
     /// <summary>
-    /// The TTY-6 itself: 6-register UART protocol, 40x20 terminal emulation and
+    /// The TTY-6 itself: 7-register UART protocol, 40x20 terminal emulation and
     /// the keyboard input FIFO — no Unity, networking or save concerns. Every
     /// mutation reports what it touched as <see cref="TerminalChange"/> flags so
     /// the owning device can raise the matching dirty signals. Not thread-safe;
@@ -18,7 +18,17 @@ namespace SerialTerminal.Core
         public const int Rows = 20;
         public const int Columns = 40;
         public const int RxCapacity = 256;
-        public const int RegisterCount = (int)TerminalRegister.Col + 1;
+        /// <summary>Register count; the map is the contiguous addresses 0..N-1.</summary>
+        public static readonly int RegisterCount = Enum.GetValues(typeof(TerminalRegister)).Length;
+
+        /// <summary>Highest pen colour value: the last standard logic colour (Purple).</summary>
+        public const int MaxColor = 11;
+
+        /// <summary>Colour plane char for the default phosphor green pen (-1).</summary>
+        internal const char DefaultColorChar = ' ';
+
+        /// <summary>Colour plane encoding (snapshots, wire, saves): one char per cell, colours 0–11.</summary>
+        private const string ColorChars = "0123456789ab";
 
         /// <summary>
         /// Control characters honoured on output.
@@ -45,9 +55,13 @@ namespace SerialTerminal.Core
         private const int PackedChars = 6;
 
         private readonly char[] _cells = new char[Rows * Columns];
+        private readonly char[] _colors = new char[Rows * Columns];
         private readonly Queue<char> _rx = new();
         private int _cursorRow;
         private int _cursorCol;
+
+        /// <summary>Colour applied to newly printed characters (colour plane char).</summary>
+        private char _pen = DefaultColorChar;
 
         /// <summary>
         /// Transfer mode for writes to the DATA register: unbuffered = one char per
@@ -122,6 +136,8 @@ namespace SerialTerminal.Core
                     return (_cursorRow, TerminalChange.None);
                 case TerminalRegister.Col:
                     return (_cursorCol, TerminalChange.None);
+                case TerminalRegister.Color:
+                    return (CharToColor(_pen), TerminalChange.None);
                 default:
                     throw new StackUnderflowException();
             }
@@ -171,6 +187,9 @@ namespace SerialTerminal.Core
                 case TerminalRegister.Col:
                     _cursorCol = Clamp((int)value, 0, Columns - 1);
                     return TerminalChange.Screen;
+                case TerminalRegister.Color:
+                    _pen = ColorToChar(Clamp((int)value, -1, MaxColor));
+                    return TerminalChange.None;
                 default:
                     throw new StackOverflowException();
             }
@@ -208,6 +227,7 @@ namespace SerialTerminal.Core
         public TerminalChange Reset()
         {
             ClearScreen();
+            _pen = DefaultColorChar;
             _rx.Clear();
             Overflow = false;
             _outputBuffered = false;
@@ -307,6 +327,7 @@ namespace SerialTerminal.Core
                     {
                         _cursorCol--;
                         _cells[(_cursorRow * Columns) + _cursorCol] = ' ';
+                        _colors[(_cursorRow * Columns) + _cursorCol] = DefaultColorChar;
                     }
                     return;
                 case CH_FF:
@@ -315,6 +336,7 @@ namespace SerialTerminal.Core
             }
             if (c < ' ') return;
             _cells[(_cursorRow * Columns) + _cursorCol] = c;
+            _colors[(_cursorRow * Columns) + _cursorCol] = _pen;
             _cursorCol++;
             if (_cursorCol >= Columns)
             {
@@ -330,12 +352,21 @@ namespace SerialTerminal.Core
             if (_cursorRow < Rows) return;
             _cursorRow = Rows - 1;
             Array.Copy(_cells, Columns, _cells, 0, (Rows - 1) * Columns);
-            for (int c = 0; c < Columns; c++) _cells[((Rows - 1) * Columns) + c] = ' ';
+            Array.Copy(_colors, Columns, _colors, 0, (Rows - 1) * Columns);
+            for (int c = 0; c < Columns; c++)
+            {
+                _cells[((Rows - 1) * Columns) + c] = ' ';
+                _colors[((Rows - 1) * Columns) + c] = DefaultColorChar;
+            }
         }
 
         private void ClearScreen()
         {
-            for (int i = 0; i < _cells.Length; i++) _cells[i] = ' ';
+            for (int i = 0; i < _cells.Length; i++)
+            {
+                _cells[i] = ' ';
+                _colors[i] = DefaultColorChar;
+            }
             _cursorRow = 0;
             _cursorCol = 0;
         }
@@ -349,14 +380,17 @@ namespace SerialTerminal.Core
         public TerminalSnapshot Snapshot(int version)
         {
             string[] lines = new string[Rows];
+            string[] colors = new string[Rows];
             for (int r = 0; r < Rows; r++)
             {
                 lines[r] = new string(_cells, r * Columns, Columns);
+                colors[r] = new string(_colors, r * Columns, Columns);
             }
             return new TerminalSnapshot
             {
                 Version = version,
                 Lines = lines,
+                Colors = colors,
                 CursorRow = _cursorRow,
                 CursorCol = _cursorCol
             };
@@ -367,7 +401,8 @@ namespace SerialTerminal.Core
         {
             return new ScreenContent
             {
-                Text = ScreenToString(),
+                Text = PlaneToString(_cells),
+                Colors = PlaneToString(_colors),
                 CursorRow = _cursorRow,
                 CursorCol = _cursorCol
             };
@@ -377,7 +412,8 @@ namespace SerialTerminal.Core
         /// <param name="screen">Wire/save form of the screen.</param>
         public TerminalChange RestoreScreen(ScreenContent screen)
         {
-            ScreenFromString(screen.Text);
+            PlaneFromString(_cells, screen.Text);
+            PlaneFromString(_colors, screen.Colors);
             _cursorRow = Clamp(screen.CursorRow, 0, Rows - 1);
             _cursorCol = Clamp(screen.CursorCol, 0, Columns - 1);
             return TerminalChange.Screen;
@@ -403,7 +439,8 @@ namespace SerialTerminal.Core
                 Overflow = Overflow,
                 OutputBuffered = _outputBuffered,
                 InputBuffered = _inputBuffered,
-                LocalEcho = _localEcho
+                LocalEcho = _localEcho,
+                PenColor = CharToColor(_pen)
             };
         }
 
@@ -412,6 +449,7 @@ namespace SerialTerminal.Core
         public TerminalChange Restore(TerminalMemento memento)
         {
             _ = RestoreScreen(memento.Screen);
+            _pen = ColorToChar(Clamp(memento.PenColor, -1, MaxColor));
             _outputBuffered = memento.OutputBuffered;
             _inputBuffered = memento.InputBuffered;
             _localEcho = memento.LocalEcho;
@@ -433,22 +471,29 @@ namespace SerialTerminal.Core
 
         #region Screen <-> string
 
-        private string ScreenToString()
+        /// <summary>One cell plane (text or colours) as rows joined with '\n',
+        /// trailing blanks trimmed.</summary>
+        /// <param name="cells">The plane to serialize.</param>
+        private static string PlaneToString(char[] cells)
         {
-            StringBuilder sb = new(_cells.Length + Rows);
+            StringBuilder sb = new(cells.Length + Rows);
             for (int r = 0; r < Rows; r++)
             {
                 int end = Columns;
-                while (end > 0 && _cells[(r * Columns) + end - 1] == ' ') end--;
-                _ = sb.Append(_cells, r * Columns, end);
+                while (end > 0 && cells[(r * Columns) + end - 1] == ' ') end--;
+                _ = sb.Append(cells, r * Columns, end);
                 if (r < Rows - 1) _ = sb.Append('\n');
             }
             return sb.ToString();
         }
 
-        private void ScreenFromString(string text)
+        /// <summary>Refills one cell plane from its serialized form; null or
+        /// missing cells blank out.</summary>
+        /// <param name="cells">The plane to refill.</param>
+        /// <param name="text">Serialized plane, as produced by <see cref="PlaneToString"/>.</param>
+        private static void PlaneFromString(char[] cells, string text)
         {
-            ClearScreen();
+            for (int i = 0; i < cells.Length; i++) cells[i] = ' ';
             if (string.IsNullOrEmpty(text)) return;
             string[] lines = text.Split('\n');
             for (int r = 0; r < Rows && r < lines.Length; r++)
@@ -456,12 +501,26 @@ namespace SerialTerminal.Core
                 string line = lines[r];
                 for (int c = 0; c < Columns && c < line.Length; c++)
                 {
-                    _cells[(r * Columns) + c] = line[c];
+                    cells[(r * Columns) + c] = line[c];
                 }
             }
         }
 
         #endregion Screen <-> string
+
+        /// <summary>The colour plane char for a pen colour value.</summary>
+        /// <param name="color">Pen colour value, -1 (default) to <see cref="MaxColor"/>.</param>
+        internal static char ColorToChar(int color)
+        {
+            return color < 0 ? DefaultColorChar : ColorChars[color];
+        }
+
+        /// <summary>The pen colour value for a colour plane char, -1 for the default.</summary>
+        /// <param name="code">Colour plane char.</param>
+        internal static int CharToColor(char code)
+        {
+            return ColorChars.IndexOf(code);
+        }
 
         /// <summary>net472 has no Math.Clamp; local helper keeps the core Unity-free.</summary>
         /// <param name="value">Value to clamp.</param>

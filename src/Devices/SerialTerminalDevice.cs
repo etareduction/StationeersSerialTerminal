@@ -28,7 +28,7 @@ namespace SerialTerminal.Devices
     {
         /// <summary>
         /// Class-specific NetworkUpdateFlags bit for the screen payload (cells +
-        /// cursor). Vanilla puts per-class payloads at 1024+ (see
+        /// colours + cursor). Vanilla puts per-class payloads at 1024+ (see
         /// NetworkUpdateType.Thing.*); below us the chain occupies 8/16/32/128
         /// (Thing), 64 (Structure) and 256 (LogicUnitBase).
         /// </summary>

@@ -3,7 +3,7 @@
 The TTY-6 (`StructureSerialTerminal`, built from `ItemKitSerialTerminal`) is a
 free-standing computer block — desk unit, monitor and keyboard — with no
 processor and no storage: a character display and a keyboard controller wired
-to a 6-register memory-mapped UART. Any IC10 housing on the same data network
+to a 7-register memory-mapped UART. Any IC10 housing on the same data network
 can drive it with `get`/`put`.
 
 ## Screen
@@ -14,6 +14,9 @@ can drive it with `get`/`put`.
 - Full printable ASCII (32–126; codes 128–255 except 133 also print if the UI font
   has a glyph for them). The same content is shown on the in-world monitor and in
   the terminal window (click the screen to open).
+- Characters print in the current pen colour (COLOR register, see below); the
+  default is the terminal's phosphor green. Every cell keeps the colour it was
+  printed with.
 - The terminal's memory is **volatile**: switching it off or losing power wipes
   everything — screen, cursor, input FIFO, overflow flag and all modes. A power
   cycle is a full reset. State survives save/load only while the terminal stays
@@ -21,7 +24,7 @@ can drive it with `get`/`put`.
 
 ## UART registers (`get`/`put`)
 
-`GetStackSize` reports 6. Reading or writing any other address faults the IC.
+`GetStackSize` reports 7. Reading or writing any other address faults the IC.
 
 | Addr | Name   | `put` (write)                                        | `get` (read)                               |
 |------|--------|------------------------------------------------------|--------------------------------------------|
@@ -31,6 +34,7 @@ can drive it with `get`/`put`.
 | 3    | CTRL   | Command, see below                                   | Status bits, see below                      |
 | 4    | ROW    | Move cursor to row (clamped to 0–19)                 | Current cursor row                          |
 | 5    | COL    | Move cursor to column (clamped to 0–39)              | Current cursor column                       |
+| 6    | COLOR  | Set the pen colour, see below (clamped to -1–11)     | Current pen colour                          |
 
 The IC10 `clr` instruction (clear device stack) resets the whole terminal:
 clears the screen, discards the input FIFO, clears the overflow flag and returns
@@ -88,6 +92,35 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 Other codes below 32 are ignored. Codes above 255 are ignored. For a full
 newline print NEL (133), or CR then LF — a bare LF leaves the column unchanged.
 
+### Text colour (`put term 6 <colour>`)
+
+The COLOR register holds the pen colour applied to newly printed characters.
+Writing it never recolours text already on screen — every cell keeps the
+colour it was printed with. Values are the game's standard logic colour
+values, the same ones other devices take through the `Color` logic variable,
+so the IC10 `Color.*` constants work directly:
+
+| Value | Colour       | Value | Colour        |
+|-------|--------------|-------|---------------|
+| -1    | phosphor green (terminal default) | 5 | `Color.Yellow` |
+| 0     | `Color.Blue` | 6     | `Color.White` |
+| 1     | `Color.Gray` | 7     | `Color.Black` |
+| 2     | `Color.Green`| 8     | `Color.Brown` |
+| 3     | `Color.Orange`| 9    | `Color.Khaki` |
+| 4     | `Color.Red`  | 10    | `Color.Pink`  |
+|       |              | 11    | `Color.Purple`|
+
+- Writes clamp to -1–11; reads return the current pen.
+- Everything that prints uses the pen — circuit output and the local echo
+  (CTRL 9) alike.
+- The destructive backspace (DEL) resets the erased cell to the default
+  colour. Clearing the screen (FF, CTRL 1) resets all cells; `clr` and a
+  power cycle also reset the pen itself.
+- `Color.Black` (7) is legible on neither the in-world monitor nor the
+  terminal window — both draw on a near-black background.
+- This is separate from the vanilla `Color` logic variable, which paints
+  device parts the terminal never renders and has no effect on the text.
+
 ## Logic variables (`l`/`s`)
 
 | LogicType  | Access | Meaning                                                        |
@@ -95,6 +128,7 @@ newline print NEL (133), or CR then LF — a bare LF leaves the column unchanged
 | `Setting`  | RW     | Write: print a packed string (same as `put 1`). Read: last value written |
 | `Quantity` | R      | Characters waiting in the input FIFO (same as COUNT)           |
 | `Error`    | R      | 1 while the input buffer has overflowed                        |
+| `Color`    | RW     | Vanilla paint colour (inherited); does not affect the text — use the COLOR register |
 | `On`       | RW     | Device power switch                                            |
 | `Power`    | R      | 1 when powered                                                 |
 | `RequiredPower`, `PrefabHash`, `ReferenceId`, `NameHash` | R | Standard device values |

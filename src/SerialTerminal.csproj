@@ -5,7 +5,7 @@
     <LangVersion>14</LangVersion>
     <AssemblyName>SerialTerminal</AssemblyName>
     <RootNamespace>SerialTerminal</RootNamespace>
-    <Version>0.5.0</Version>
+    <Version>0.6.0</Version>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <!-- Build straight into mod/ so that folder IS the deployable mod and can be symlinked into the game. -->

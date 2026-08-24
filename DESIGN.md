@@ -22,8 +22,8 @@ keystroke at a time.
 ## Hardware model (what IC10 sees)
 
 The device implements `IMemoryReadable`/`IMemoryWritable`, so vanilla `get`/`put`
-(`getd`/`putd`) work on it. Six registers, modelled on a 6551 ACIA-style memory-mapped
-UART plus 6845 CRTC-style cursor address registers:
+(`getd`/`putd`) work on it. Seven registers, modelled on a 6551 ACIA-style memory-mapped
+UART plus 6845 CRTC-style cursor address registers and a colour register:
 
 | Addr | Name  | `get` (read)                          | `put` (write)                                  |
 |------|-------|---------------------------------------|------------------------------------------------|
@@ -33,6 +33,7 @@ UART plus 6845 CRTC-style cursor address registers:
 | 3    | CTRL  | status: bit0 input ready, bit1 overflow, bit2 output buffered, bit3 input buffered, bit4 local echo | 1 clear screen, 2 flush input, 3 clear overflow, 4/5 output unbuffered/buffered, 6/7 input unbuffered/buffered, 8/9 local echo off/on |
 | 4    | ROW   | cursor row                            | set cursor row (clamped)                        |
 | 5    | COL   | cursor column                         | set cursor column (clamped)                     |
+| 6    | COLOR | current pen colour                    | set pen colour for newly printed characters: the standard logic colour values 0–11, -1 restores the default phosphor green (clamped) |
 
 Input and output transfer modes are independent and both default to unbuffered
 (byte-at-a-time); buffered mode moves one packed ASCII-6 string (≤6 chars) per
@@ -48,6 +49,13 @@ stack devices.
 
 Packed ASCII-6 is the vanilla text convention (`ProgrammableChip.PackAscii6/UnpackAscii6`,
 IC10 `STR("...")` literals, LED-display String mode) — 6 chars per double, 53-bit payload.
+
+Colour is stored per cell: writing COLOR only affects characters printed
+afterwards. DEL and screen clears reset cells to the default phosphor green;
+`clr` and power loss also reset the pen. Renderers map pen values to the
+game's colour swatches (`GameManager.GetColorSwatch`); the inherited `Color`
+logic variable paints the never-rendered digit material and does not affect
+the text.
 
 Logic types (all vanilla — no LogicType enum patching):
 - `Setting` (RW): write = print packed ASCII-6 (same as `put 1`); read = last value written.
@@ -151,9 +159,9 @@ FPGA mod conventions):
    no config).
 3. Sync/persistence:
    - Server→client on class-specific `NetworkUpdateFlags` bits in
-     `BuildUpdate`/`ProcessUpdate` + join serialization: screen text + cursor
-     (bit 1024) and FIFO count + overflow (bit 2048), so draining input never
-     resends the unchanged screen.
+     `BuildUpdate`/`ProcessUpdate` + join serialization: screen text + colour
+     plane + cursor (bit 1024) and FIFO count + overflow (bit 2048), so
+     draining input never resends the unchanged screen.
    - Save: `SerialTerminalSaveData : LogicBaseSaveData` registered through
      LaunchPadBooster `Mod.AddSaveDataType<T>()`.
    - `WriteMemory`/`ReadMemory` run on the sim thread; `SyncedTerminal`'s lock and

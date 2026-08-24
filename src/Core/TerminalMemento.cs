@@ -18,5 +18,8 @@ namespace SerialTerminal.Core
         public required bool InputBuffered { get; init; }
 
         public required bool LocalEcho { get; init; }
+
+        /// <summary>Pen colour value: -1 default, 0–11 logic colour values.</summary>
+        public required int PenColor { get; init; }
     }
 }
