@@ -1,10 +1,15 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.CompilerServices;
+using Assets.Scripts;
 using BepInEx;
 using BepInEx.Logging;
 using HarmonyLib;
+using ImGuiNET.Unity;
 using LaunchPadBooster;
 using SerialTerminal.Devices;
+using SerialTerminal.Display;
 using SerialTerminal.Networking;
+using UnityEngine;
 
 namespace SerialTerminal
 {
@@ -42,8 +47,29 @@ namespace SerialTerminal
             MOD.AddSaveDataType<SerialTerminalSaveData>();
             MOD.Networking.RegisterMessage<TerminalInputMessage>();
 
-            new Harmony(GUID).PatchAll(typeof(SerialTerminalPlugin).Assembly);
+            Harmony harmony = new(GUID);
+            harmony.PatchAll(typeof(SerialTerminalPlugin).Assembly);
+            // Application.isBatchMode is reliable this early; GameManager's
+            // flag (set on engine init) additionally covers server-platform
+            // builds launched without -batchmode.
+            if (!Application.isBatchMode && !GameManager.IsBatchMode)
+            {
+                PatchFontAtlas(harmony);
+            }
             Log.LogInfo($"SerialTerminal {VERSION} initialized");
+        }
+
+        /// <summary>
+        /// NoInlining keeps the ImGui types (which the dedicated server cannot
+        /// load) out of Awake's JIT; the font patch applies on clients only.
+        /// </summary>
+        /// <param name="harmony">The plugin's Harmony instance.</param>
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        private static void PatchFontAtlas(Harmony harmony)
+        {
+            _ = harmony.Patch(
+                AccessTools.Method(typeof(TextureManager), nameof(TextureManager.BuildFontAtlas)),
+                postfix: new HarmonyMethod(typeof(TerminalFontAtlas), nameof(TerminalFontAtlas.AfterBuildFontAtlas)));
         }
     }
 }

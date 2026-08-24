@@ -50,6 +50,17 @@ stack devices.
 Packed ASCII-6 is the vanilla text convention (`ProgrammableChip.PackAscii6/UnpackAscii6`,
 IC10 `STR("...")` literals, LED-display String mode) — 6 chars per double, 53-bit payload.
 
+Unbuffered DATA writes take one Unicode code point per put. 1–255 are the
+Latin-1 characters (NEL 133 included), identical to pre-Unicode versions;
+higher values print the matching BMP character — IC10 `$` hex literals mirror
+U+XXXX numbering (`put d0 0 $2588` prints `█`). Surrogate halves and any value
+above U+FFFF print `?` (cells hold one UTF-16 char) — bad writes are visible
+rather than silently dropped. Cells whose glyph advance differs from the cell width
+are drawn individually positioned (colour-run batching keeps the rest); the
+mod ships its own monospace font for glyph coverage (see the ImGui section),
+and code points outside it draw the atlas fallback glyph. Input stays ASCII:
+keystrokes outside the set arrive as `?`.
+
 Colour is stored per cell: writing COLOR only affects characters printed
 afterwards. DEL and screen clears reset cells to the default phosphor green;
 `clr` and power loss also reset the pen. Renderers map pen values to the
@@ -113,6 +124,17 @@ screen-overlay context from `ImGuiManager.LateUpdate`. Two uses here:
   `TerminalScreenRenderer` repaints the texture only when the device's screen
   version changes — zero cost while idle. Font scale is computed per repaint so the
   whole cell grid fills the texture.
+- **Terminal font**: the game's own atlas covers little beyond Latin-1, so the
+  mod ships DejaVu Sans Mono (`mod/Fonts/`, free licence included) and appends
+  it to the shared atlas via a client-only Harmony postfix on
+  `TextureManager.BuildFontAtlas` — after the game's fonts (`Fonts[0]` and the
+  game UI stay untouched), before the atlas texture is created, re-applied on
+  every rebuild. The requested ranges live in `TerminalFontAtlas.GlyphRanges`.
+  Both terminal surfaces pick the font by stored atlas index with a `Fonts[0]`
+  fallback (file missing, injection failed). The patch is installed from the
+  plugin entrypoint (`Patches/` is prefab-build-time only) behind a batch-mode
+  guard and a NoInlining helper, keeping ImGui types out of the dedicated
+  server's JIT.
 
 Simulation and presentation are separated: `TerminalState` (`src/Core/`) owns the
 UART registers, screen emulation and input FIFO with no Unity or ImGui types;
@@ -152,7 +174,8 @@ FPGA mod conventions):
      wire `BuildStates[0].Tool.ToolExit` to the new kit.
    - Register both via `Mod.AddPrefabs` (SDK bookkeeping: join validation) and add
      to `WorldManager.Instance.SourcePrefabs` directly for the current `LoadAll`.
-     This `Prefab.LoadAll` prefix is the mod's only Harmony patch.
+     The mod's only other Harmony patch is the client-only font-atlas postfix
+     (see the ImGui section).
 2. Rendering: ImGui on a RenderTexture quad over the monitor face (see the ImGui
    section above); the vanilla numeric readout is suppressed by the `OnAddToPool`
    veto (no patch). Grid is fixed at 20×40 (constants in `TerminalState`;
@@ -177,6 +200,7 @@ FPGA mod conventions):
 mod/                           # this folder IS the mod
 ├── About/About.xml            # ModMetadata
 ├── API.md                     # device API reference
+├── Fonts/                     # terminal font (DejaVu Sans Mono) + its licence
 ├── GameData/serialterminal.xml        # printer recipe
 ├── GameData/Language/english.xml      # names + Stationpedia descriptions
 └── SerialTerminal.dll         # BepInEx-style plugin, loaded by SLP (build output)

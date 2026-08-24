@@ -172,7 +172,7 @@ namespace SerialTerminal.Core
                         return TerminalChange.Screen;
                     }
                     int code = (int)value;
-                    if (code is > 0 and < 256) PutChar((char)code);
+                    if (code > 0) PutCodePoint(code);
                     return TerminalChange.Screen;
                 case TerminalRegister.Str:
                     PutPacked(value);
@@ -301,6 +301,19 @@ namespace SerialTerminal.Core
             string text = ProgrammableChip.UnpackAscii6(value, signed: true);
             if (string.IsNullOrEmpty(text)) return;
             foreach (char c in text) PutChar(c);
+        }
+
+        /// <summary>
+        /// Print one Unicode code point (unbuffered DATA writes): BMP characters
+        /// print directly; surrogate halves and any value above U+FFFF print '?'
+        /// (a cell holds one UTF-16 char), keeping bad writes visible.
+        /// </summary>
+        /// <param name="codePoint">Positive value written by the chip.</param>
+        private void PutCodePoint(int codePoint)
+        {
+            PutChar(codePoint <= char.MaxValue && !char.IsSurrogate((char)codePoint)
+                ? (char)codePoint
+                : '?');
         }
 
         [SuppressMessage("Style", "IDE0010:Add missing cases",
@@ -501,7 +514,8 @@ namespace SerialTerminal.Core
                 string line = lines[r];
                 for (int c = 0; c < Columns && c < line.Length; c++)
                 {
-                    cells[(r * Columns) + c] = line[c];
+                    // Cells must stay XML/wire-serializable: no lone surrogates.
+                    cells[(r * Columns) + c] = char.IsSurrogate(line[c]) ? '?' : line[c];
                 }
             }
         }

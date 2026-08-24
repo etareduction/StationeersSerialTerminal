@@ -1,0 +1,127 @@
+# TTY-6 Unicode pong, needs only the terminal on d0. Ball $25CF
+# bounces in a $2550-$255D box frame; A/D slide the $2588 paddle,
+# saves add $25A0 marks, a miss clears them. Keys pop off DATA.
+alias term d0
+alias key r0
+alias bx r1
+alias by r2
+alias vx r3
+alias vy r4
+alias px r5
+alias opx r6
+alias i r7
+alias sc r8
+define ADDR_DATA 0
+define ADDR_STR 1
+define ADDR_ROW 4
+define ADDR_COL 5
+define PAD_W 6
+define PAD_ROW 18
+s term On 1
+clr term
+put term ADDR_DATA $2554 # frame: top rule from the home cursor...
+move i 1
+top:
+put term ADDR_DATA $2550
+add i i 1
+blt i 39 top
+put term ADDR_DATA $2557
+move by 1                # ...side walls...
+walls:
+put term ADDR_ROW by
+put term ADDR_COL 0
+put term ADDR_DATA $2551
+put term ADDR_COL 39
+put term ADDR_DATA $2551
+add by by 1
+blt by 19 walls
+put term ADDR_DATA $255A # ...bottom rule (cursor wrapped to row 19)
+move i 1
+bottom:
+put term ADDR_DATA $2550
+add i i 1
+blt i 39 bottom
+put term ADDR_DATA $255D
+put term ADDR_ROW 1
+put term ADDR_COL 2
+put term ADDR_STR STR("PONG")
+move vx 1
+move px 17
+move opx 17
+jal padraw
+jal reset
+loop:
+yield
+inkey:                   # drain the FIFO: A slides left, D right
+get key term ADDR_DATA
+beqz key keysdone
+seq i key 100
+seq key key 97
+sub i i key
+add px px i
+add px px i
+j inkey
+keysdone:
+max px px 1
+min px px 33
+beq px opx nopad
+jal padraw
+nopad:
+put term ADDR_ROW by     # erase the ball, step it, bounce off walls
+put term ADDR_COL bx
+put term ADDR_DATA 32
+add bx bx vx
+add by by vy
+sle i bx 1
+select vx i 1 vx
+sge i bx 38
+select vx i -1 vx
+sle i by 2
+select vy i 1 vy
+bne by PAD_ROW draw      # paddle row: save or miss
+blt bx px miss
+add i px PAD_W
+bge bx i miss
+move vy -1               # saved: bounce back and mark a point
+move by 17
+put term ADDR_ROW 1
+put term ADDR_COL sc
+put term ADDR_DATA $25A0
+add sc sc 1
+min sc sc 38
+j draw
+miss:
+jal reset
+draw:
+put term ADDR_ROW by
+put term ADDR_COL bx
+put term ADDR_DATA $25CF
+j loop
+padraw:                  # erase the paddle at opx, redraw at px
+put term ADDR_ROW PAD_ROW
+put term ADDR_COL opx
+move i 0
+perase:
+put term ADDR_DATA 32
+add i i 1
+blt i PAD_W perase
+put term ADDR_COL px
+pdraw:
+put term ADDR_DATA $2588
+sub i i 1
+bgt i 0 pdraw
+move opx px
+j ra
+reset:                   # serve from the centre, clear the marks
+move bx 20
+move by 5
+move vy 1
+put term ADDR_ROW 1
+put term ADDR_COL 8
+move i 8
+rclear:
+put term ADDR_DATA 32
+add i i 1
+ble i 38 rclear
+move sc 8
+j ra

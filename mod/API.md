@@ -11,8 +11,16 @@ can drive it with `get`/`put`.
 - Fixed character grid, **40 columns × 20 rows**.
 - The cursor advances on every printed character, wraps at the end of a row, and
   the screen scrolls up one row when a line feed runs off the bottom.
-- Full printable ASCII (32–126; codes 128–255 except 133 also print if the UI font
-  has a glyph for them). The same content is shown on the in-world monitor and in
+- Prints Unicode: an unbuffered DATA write takes one code point per `put`.
+  Codes 32–126 are ASCII and 128–255 the Latin-1 characters, both exactly as in
+  earlier versions; higher values print the matching character — IC10 hex
+  literals mirror Unicode's U+XXXX numbering, so `put term 0 $2588` prints `█`.
+  Surrogate halves (`$D800`–`$DFFF`) and any value above U+FFFF print `?` (a
+  cell holds one UTF-16 char), so a bad write shows up on screen instead of
+  vanishing. The terminal ships its own monospace font covering the Latin,
+  Greek and Cyrillic scripts plus the punctuation, currency, letterlike,
+  arrow, math, technical, box-drawing, block, shape, symbol and braille
+  blocks; code points outside that coverage draw a fallback glyph. The same content is shown on the in-world monitor and in
   the terminal window (click the screen to open).
 - Characters print in the current pen colour (COLOR register, see below); the
   default is the terminal's phosphor green. Every cell keeps the colour it was
@@ -45,7 +53,8 @@ all modes (transfer modes, local echo) to defaults. A power cycle does the same.
 Input and output each have an independent transfer mode, set via CTRL commands.
 **Both default to unbuffered.**
 
-- **Unbuffered** (default): DATA moves one character per `get`/`put`.
+- **Unbuffered** (default): DATA moves one character per `get`/`put`; a write
+  takes a Unicode code point.
 - **Buffered**: DATA moves one packed ASCII-6 string per `get`/`put` — a write
   unpacks and prints up to 6 characters (same as STRING), a read pops up to 6
   waiting characters and returns them packed (first typed character in the
@@ -89,8 +98,11 @@ Modes only affect the DATA register; STRING, COUNT, CTRL, ROW and COL are unchan
 | 127  | DEL  | Destructive backspace: cursor left one column and erase that cell (`BS SP BS` in one code); does nothing at column 0 |
 | 133  | NEL  | Next line: carriage return + line feed in one code            |
 
-Other codes below 32 are ignored. Codes above 255 are ignored. For a full
-newline print NEL (133), or CR then LF — a bare LF leaves the column unchanged.
+Other codes below 32 are ignored. For a full newline print NEL (133), or CR
+then LF — a bare LF leaves the column unchanged.
+
+STRING writes and buffered DATA writes stay packed ASCII-6 (codes 1–255 per
+character); only unbuffered DATA writes take the full Unicode code-point range.
 
 ### Text colour (`put term 6 <colour>`)
 

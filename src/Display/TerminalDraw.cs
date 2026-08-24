@@ -27,8 +27,10 @@ namespace SerialTerminal.Display
 
         extension(ImGuiIOPtr io)
         {
-            /// <summary>The font terminal text is drawn with (first in the atlas).</summary>
-            public ImFontPtr TerminalFont => io.Fonts.Fonts[0];
+            /// <summary>The font terminal text is drawn with: the mod's own
+            /// Unicode monospace font when present in the shared atlas, else
+            /// the game font.</summary>
+            public ImFontPtr TerminalFont => TerminalFontAtlas.FontFor(io);
         }
 
         extension(TerminalSnapshot snapshot)
@@ -36,12 +38,20 @@ namespace SerialTerminal.Display
             /// <summary>
             /// Draws the snapshot's cell grid plus block cursor at the current
             /// cursor position of the current ImGui window. Caller pushes the font.
-            /// Consecutive same-coloured cells in a row share one draw call.
+            /// Consecutive same-coloured cells whose glyphs advance
+            /// exactly one cell share one draw call.
             /// </summary>
             public void Draw()
             {
                 float lineH = ImGui.GetTextLineHeight();
                 float charW = ImGui.CalcTextSize("M").x;
+                // Managed view of the glyph advances; GetCharAdvance would be
+                // one P/Invoke per cell.
+                ImFontPtr font = ImGui.GetFont();
+                ImVector<float> advances = font.IndexAdvanceX;
+                float fallbackAdvance = font.FallbackAdvanceX;
+                float Advance(char c) => c < advances.Size ? advances[c] : fallbackAdvance;
+                float cellAdvance = Advance('M');
                 ImDrawListPtr drawList = ImGui.GetWindowDrawList();
                 Vector2 origin = ImGui.GetCursorScreenPos();
 
@@ -54,7 +64,14 @@ namespace SerialTerminal.Display
                     {
                         int start = col;
                         char code = colors[col];
-                        while (col < line.Length && colors[col] == code) col++;
+                        // Batch only glyphs that advance exactly one cell;
+                        // others are positioned individually.
+                        while (col < line.Length && colors[col] == code
+                            && (line[col] < '\u0080' || Advance(line[col]) == cellAdvance))
+                        {
+                            col++;
+                        }
+                        if (col == start) col++;
                         drawList.AddText(
                             new Vector2(origin.x + (start * charW), origin.y + (row * lineH)),
                             CellColor(code),

@@ -12,8 +12,8 @@ directly to the input buffer.
 
 - [`mod/API.md`](mod/API.md) — the device's register-level API reference
 - [`DESIGN.md`](DESIGN.md) — how the mod is built and why
-- [`examples/`](examples) — IC10 programs: a self-test, a colour demo and two
-  interactive shells
+- [`examples/`](examples) — IC10 programs: a self-test, a colour demo, two
+  interactive shells and Unicode pong
 
 ## Building
 
