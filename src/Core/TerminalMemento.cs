@@ -21,5 +21,8 @@ namespace SerialTerminal.Core
 
         /// <summary>Pen colour value: -1 default, 0–11 logic colour values.</summary>
         public required int PenColor { get; init; }
+
+        /// <summary>Deferred wrap pending (last print landed in the last column).</summary>
+        public required bool WrapPending { get; init; }
     }
 }

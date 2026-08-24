@@ -9,8 +9,12 @@ can drive it with `get`/`put`.
 ## Screen
 
 - Fixed character grid, **40 columns × 20 rows**.
-- The cursor advances on every printed character, wraps at the end of a row, and
-  the screen scrolls up one row when a line feed runs off the bottom.
+- The cursor advances on every printed character and wraps at the end of a row;
+  the screen scrolls up one row when a line feed runs off the bottom. The wrap
+  out of the last column is deferred (VT-style): printing at column 39 leaves
+  the cursor on it, and the wrap — including the scroll when on the bottom
+  row — happens just before the next printed character, so the bottom-right
+  cell is usable.
 - Prints Unicode: an unbuffered DATA write takes one code point per `put`.
   Codes 32–126 are ASCII and 128–255 the Latin-1 characters, both exactly as in
   earlier versions; higher values print the matching character — IC10 hex
@@ -20,8 +24,9 @@ can drive it with `get`/`put`.
   vanishing. The terminal ships its own monospace font covering the Latin,
   Greek and Cyrillic scripts plus the punctuation, currency, letterlike,
   arrow, math, technical, box-drawing, block, shape, symbol and braille
-  blocks; code points outside that coverage draw a fallback glyph. The same content is shown on the in-world monitor and in
-  the terminal window (click the screen to open).
+  blocks; code points outside that coverage draw a fallback glyph. The same
+  content is shown on the in-world monitor and in the terminal window (click
+  the screen to open).
 - Characters print in the current pen colour (COLOR register, see below); the
   default is the terminal's phosphor green. Every cell keeps the colour it was
   printed with.

@@ -43,6 +43,10 @@ namespace SerialTerminal.Devices
         [XmlElement]
         public int PenColor = -1;
 
+        /// <summary>Deferred wrap pending; absent (false) in older saves.</summary>
+        [XmlElement]
+        public bool WrapPending;
+
         /// <summary>Fills the XML fields from a captured terminal state.</summary>
         /// <param name="memento">State captured at save time.</param>
         internal void CopyFrom(TerminalMemento memento)
@@ -57,6 +61,7 @@ namespace SerialTerminal.Devices
             InputBuffered = memento.InputBuffered;
             LocalEcho = memento.LocalEcho;
             PenColor = memento.PenColor;
+            WrapPending = memento.WrapPending;
         }
 
         /// <summary>The saved state as an immutable memento, ready to restore.</summary>
@@ -78,7 +83,8 @@ namespace SerialTerminal.Devices
                 OutputBuffered = OutputBuffered,
                 InputBuffered = InputBuffered,
                 LocalEcho = LocalEcho,
-                PenColor = PenColor
+                PenColor = PenColor,
+                WrapPending = WrapPending
             };
         }
     }

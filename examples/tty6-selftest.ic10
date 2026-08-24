@@ -47,13 +47,14 @@ put term ADDR_DATA CH_NEL
 l n term Setting                # T3: Setting reads back what was set
 sub n n STR("VIA-ST")
 jal check
-put term ADDR_ROW 12            # T4: wrap at col 40 = CR+LF
+put term ADDR_ROW 12            # T4: deferred wrap holds at (12,39)
 put term ADDR_COL 38
 put term ADDR_STR STR("AB")
 get n term ADDR_ROW
 get c term ADDR_COL
-sub n n 13
+sub n n 12
 add n n c
+sub n n 39
 jal check
 put term ADDR_CTRL 5     # output buffered
 put term ADDR_CTRL 7     # input buffered

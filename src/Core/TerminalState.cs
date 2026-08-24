@@ -60,6 +60,13 @@ namespace SerialTerminal.Core
         private int _cursorRow;
         private int _cursorCol;
 
+        /// <summary>
+        /// Deferred (VT-style) wrap: set after printing in the last column;
+        /// applied just before the next printable character, so the bottom-right
+        /// cell is usable without scrolling.
+        /// </summary>
+        private bool _wrapPending;
+
         /// <summary>Colour applied to newly printed characters (colour plane char).</summary>
         private char _pen = DefaultColorChar;
 
@@ -182,9 +189,11 @@ namespace SerialTerminal.Core
                 case TerminalRegister.Ctrl:
                     return Execute((TerminalCommand)(int)value);
                 case TerminalRegister.Row:
+                    _wrapPending = false;
                     _cursorRow = Clamp((int)value, 0, Rows - 1);
                     return TerminalChange.Screen;
                 case TerminalRegister.Col:
+                    _wrapPending = false;
                     _cursorCol = Clamp((int)value, 0, Columns - 1);
                     return TerminalChange.Screen;
                 case TerminalRegister.Color:
@@ -323,19 +332,31 @@ namespace SerialTerminal.Core
             switch (c)
             {
                 case CH_LF:
+                    _wrapPending = false;
                     LineFeed();
                     return;
                 case CH_CR:
+                    _wrapPending = false;
                     _cursorCol = 0;
                     return;
                 case CH_NEL:
+                    _wrapPending = false;
                     _cursorCol = 0;
                     LineFeed();
                     return;
                 case CH_BS:
+                    _wrapPending = false;
                     if (_cursorCol > 0) _cursorCol--;
                     return;
                 case CH_DEL:
+                    if (_wrapPending)
+                    {
+                        // Rub out the just-printed last-column char in place.
+                        _wrapPending = false;
+                        _cells[(_cursorRow * Columns) + _cursorCol] = ' ';
+                        _colors[(_cursorRow * Columns) + _cursorCol] = DefaultColorChar;
+                        return;
+                    }
                     if (_cursorCol > 0)
                     {
                         _cursorCol--;
@@ -348,14 +369,16 @@ namespace SerialTerminal.Core
                     return;
             }
             if (c < ' ') return;
-            _cells[(_cursorRow * Columns) + _cursorCol] = c;
-            _colors[(_cursorRow * Columns) + _cursorCol] = _pen;
-            _cursorCol++;
-            if (_cursorCol >= Columns)
+            if (_wrapPending)
             {
+                _wrapPending = false;
                 _cursorCol = 0;
                 LineFeed();
             }
+            _cells[(_cursorRow * Columns) + _cursorCol] = c;
+            _colors[(_cursorRow * Columns) + _cursorCol] = _pen;
+            if (_cursorCol == Columns - 1) _wrapPending = true;
+            else _cursorCol++;
         }
 
         /// <summary>Cursor down one row, column unchanged; scrolls at the bottom.</summary>
@@ -382,6 +405,7 @@ namespace SerialTerminal.Core
             }
             _cursorRow = 0;
             _cursorCol = 0;
+            _wrapPending = false;
         }
 
         #endregion Terminal emulation
@@ -453,7 +477,8 @@ namespace SerialTerminal.Core
                 OutputBuffered = _outputBuffered,
                 InputBuffered = _inputBuffered,
                 LocalEcho = _localEcho,
-                PenColor = CharToColor(_pen)
+                PenColor = CharToColor(_pen),
+                WrapPending = _wrapPending
             };
         }
 
@@ -466,6 +491,7 @@ namespace SerialTerminal.Core
             _outputBuffered = memento.OutputBuffered;
             _inputBuffered = memento.InputBuffered;
             _localEcho = memento.LocalEcho;
+            _wrapPending = memento.WrapPending;
             _rx.Clear();
             if (!string.IsNullOrEmpty(memento.InputBuffer))
             {

@@ -43,9 +43,11 @@ the same layout `STR()` produces — so `UnpackAscii6` round-trips it.
 Control characters on output: LF(10) down one row *column unchanged* (scrolls at
 the bottom), CR(13) col 0, NEL(133) = CR+LF in one code, BS(8) cursor left
 (non-destructive, stops at col 0), DEL(127) destructive backspace (BS SP BS in
-one code), FF(12) clear screen. Line wrap at col 40 = CR+LF. Out-of-range
-address → vanilla `StackOverflow/Underflow` chip exception, exactly like other
-stack devices.
+one code), FF(12) clear screen. Line wrap is deferred (VT-style): printing the
+last column holds the cursor there and the CR+LF (scrolling at the bottom)
+applies before the next printable char, so the bottom-right cell is usable
+without scrolling. Out-of-range address → vanilla `StackOverflow/Underflow`
+chip exception, exactly like other stack devices.
 
 Packed ASCII-6 is the vanilla text convention (`ProgrammableChip.PackAscii6/UnpackAscii6`,
 IC10 `STR("...")` literals, LED-display String mode) — 6 chars per double, 53-bit payload.
